@@ -137,7 +137,6 @@ class TableauApp(tb.Window):
                 elif code.startswith("99"):
                     census_rec = "BILLED"
                 else:
-                    # If code is anything else, reject it
                     code = ""
                     census_rec = ""
 
