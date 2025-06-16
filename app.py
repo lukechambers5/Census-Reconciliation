@@ -121,22 +121,32 @@ class TableauApp(tb.Window):
                 last = str(row.get('Last Name', '')).strip().upper()
                 first = str(row.get('First Name', '')).strip().upper()
                 key = (last, first)
+                
                 code = self.charge_code_lookup.get(key, '')
                 if code == "LWBS":
                     census_rec = "LWBS"
                 elif code == "AMA":
                     census_rec = "AMA"
                 elif code == "0":
-                    census_rec = "NO CHARGE"
+                    census_rec = "NON ED ENCOUNTERS"
                 elif code == "NULL":
                     census_rec = ""
                 elif code.startswith("99"):
                     census_rec = "BILLED"
+                elif code == "":
+                    census_rec = "#N/A"
                 else:
                     census_rec = "TEMPORARY VALUE"
                 return pd.Series([code, census_rec])
 
             self.df_excel[['E&M (Pro)', 'Census Reconciliation']] = self.df_excel.apply(get_charge_code_and_census, axis=1)
+
+            if 'Status' in self.df_excel.columns:
+                self.df_excel.loc[
+                    (self.df_excel['Census Reconciliation'] == 'BILLED') &
+                    (self.df_excel['Status'].str.upper() == 'OPEN'),
+                    'Status'
+                ] = 'DE_COMPLETE'
 
 
             # Save processed file
