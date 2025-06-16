@@ -19,25 +19,62 @@ SITE_ID = ''
 
 class TableauApp(tb.Window):
     def __init__(self):
-        super().__init__(themename="darkly")
+        super().__init__(themename="cyborg")
         self.title("Census Reconciliation Tool")
-        self.geometry("1000x700")
+        self.geometry("1100x750")
+        self.resizable(False, False)
 
-        self.charge_code_lookup = None 
+        self.charge_code_lookup = None
 
-        # Fetch Tableau Data Section
-        self.fetch_btn = tb.Button(self, text="Fetch Tableau View", bootstyle=SUCCESS, command=self.fetch_tableau_data)
-        self.fetch_btn.pack(pady=10, fill=X, padx=10)
+        # Header Frame
+        header_frame = tb.Frame(self)
+        header_frame.pack(fill=X, padx=0, pady=(0, 10))
+        tb.Label(
+            header_frame,
+            text="Census Reconciliation Tool",
+            font=("Segoe UI", 22, "bold"),
+        ).pack(side=LEFT, padx=20, pady=15)
 
-        self.output_text = tb.ScrolledText(self, height=7)
-        self.output_text.pack(fill='x', padx=10, pady=5)
+        # Main Content Frame
+        main_frame = tb.Frame(self)
+        main_frame.pack(fill=BOTH, expand=True, padx=20, pady=10)
 
-        # Upload Excel File Section
-        self.upload_btn = tb.Button(self, text="Upload Excel File", bootstyle=PRIMARY, command=self.upload_file)
-        self.upload_btn.pack(pady=10, fill=X, padx=10)
+        # Left Panel (Actions)
+        left_panel = tb.Frame(main_frame)
+        left_panel.pack(side=LEFT, fill=Y, padx=(0, 20), pady=0)
 
-        self.excel_preview = tb.ScrolledText(self, height=10)
-        self.excel_preview.pack(fill='both', expand=True, padx=10, pady=5)
+        self.fetch_btn = tb.Button(
+            left_panel,
+            text="Fetch Tableau View",
+            width=22,
+            command=self.fetch_tableau_data
+        )
+        self.fetch_btn.pack(pady=(0, 15), anchor="n")
+
+        self.upload_btn = tb.Button(
+            left_panel,
+            text="Upload Excel File",
+            width=22,
+            command=self.upload_file
+        )
+        self.upload_btn.pack(pady=(0, 15), anchor="n")
+
+        # Output Text (Status/Logs)
+        tb.Label(left_panel, text="Status Log:", font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(10, 0))
+        self.output_text = tb.ScrolledText(left_panel, height=13, width=35, font=("Consolas", 9))
+        self.output_text.pack(fill=X, pady=(0, 10), padx=0)
+
+        # Right Panel (Excel Preview)
+        right_panel = tb.Frame(main_frame)
+        right_panel.pack(side=LEFT, fill=BOTH, expand=True)
+
+        tb.Label(right_panel, text="Excel Preview:", font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 5))
+        self.excel_preview = tb.ScrolledText(
+            right_panel,
+            height=30,
+            font=("Consolas", 10),
+        )
+        self.excel_preview.pack(fill=BOTH, expand=True, padx=0, pady=0)
 
     def fetch_tableau_data(self):
         self.output_text.delete("1.0", "end")
