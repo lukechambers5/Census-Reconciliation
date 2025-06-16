@@ -14,7 +14,7 @@ VIEW_ID = os.getenv("VIEW_ID")
 
 TABLEAU_SERVER = os.getenv("TABLEAU_SERVER")
 TOKEN_NAME = "Census"
-SITE_ID = ''  # adjust if needed
+SITE_ID = ''
 
 
 class TableauApp(tb.Window):
@@ -23,16 +23,16 @@ class TableauApp(tb.Window):
         self.title("Census Reconciliation Tool")
         self.geometry("1000x700")
 
-        self.charge_code_lookup = None  # To store Tableau charge codes
+        self.charge_code_lookup = None 
 
-        # Fetch Tableau Data Section (first)
+        # Fetch Tableau Data Section
         self.fetch_btn = tb.Button(self, text="Fetch Tableau View", bootstyle=SUCCESS, command=self.fetch_tableau_data)
         self.fetch_btn.pack(pady=10, fill=X, padx=10)
 
         self.output_text = tb.ScrolledText(self, height=7)
         self.output_text.pack(fill='x', padx=10, pady=5)
 
-        # Upload Excel File Section (second)
+        # Upload Excel File Section
         self.upload_btn = tb.Button(self, text="Upload Excel File", bootstyle=PRIMARY, command=self.upload_file)
         self.upload_btn.pack(pady=10, fill=X, padx=10)
 
@@ -141,7 +141,7 @@ class TableauApp(tb.Window):
 
             # Save processed file
             from pathlib import Path
-            new_file_path = Path(file_path).with_name(f"PROCESSED__________{Path(file_path).stem}.xlsx")
+            new_file_path = Path(file_path).with_name(f"PROCESSED______{Path(file_path).stem}.xlsx")
             self.df_excel.to_excel(new_file_path, index=False)
 
             # Update preview
