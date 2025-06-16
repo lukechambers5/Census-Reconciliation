@@ -6,6 +6,7 @@ This internal-use Python app reconciles hospital Excel records with Tableau cens
 
 ![App Screenshot](assets/census_rec_ss.png)
 
+*Note: The screenshot displays sample data only. Actual patient information has been omitted to ensure privacy and comply with data protection regulations.*
 ---
 
 ## 📌 What It Does
