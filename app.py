@@ -11,10 +11,10 @@ import traceback
 load_dotenv()
 ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
 VIEW_ID = os.getenv("VIEW_ID")
-
 TABLEAU_SERVER = os.getenv("TABLEAU_SERVER")
 TOKEN_NAME = os.getenv("TOKEN_NAME")
-SIDE_ID = os.getenv("SIDE_ID")
+SITE_ID = os.getenv("SITE_ID")
+
 
 class TableauApp(tb.Window):
     def __init__(self):

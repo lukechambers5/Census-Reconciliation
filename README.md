@@ -4,6 +4,10 @@ This internal-use Python app reconciles hospital Excel records with Tableau cens
 
 ---
 
+![App Screenshot](assets/census_rec_ss.png)
+
+---
+
 ## 📌 What It Does
 
 - Connects to a Tableau view to fetch patient charge codes
