@@ -121,8 +121,11 @@ class TableauApp(tb.Window):
                 last = str(row.get('Last Name', '')).strip().upper()
                 first = str(row.get('First Name', '')).strip().upper()
                 key = (last, first)
-                
-                code = self.charge_code_lookup.get(key, '')
+                code = self.charge_code_lookup.get(key, '').strip().upper()
+
+                # Default values
+                census_rec = ""
+
                 if code == "LWBS":
                     census_rec = "LWBS"
                 elif code == "AMA":
@@ -133,20 +136,24 @@ class TableauApp(tb.Window):
                     census_rec = ""
                 elif code.startswith("99"):
                     census_rec = "BILLED"
-                elif code == "":
-                    census_rec = "#N/A"
                 else:
-                    census_rec = "TEMPORARY VALUE"
+                    # If code is anything else, reject it
+                    code = ""
+                    census_rec = ""
+
                 return pd.Series([code, census_rec])
 
             self.df_excel[['E&M (Pro)', 'Census Reconciliation']] = self.df_excel.apply(get_charge_code_and_census, axis=1)
 
             if 'Status' in self.df_excel.columns:
-                self.df_excel.loc[
-                    (self.df_excel['Census Reconciliation'] == 'BILLED') &
-                    (self.df_excel['Status'].str.upper() == 'OPEN'),
-                    'Status'
-                ] = 'DE_COMPLETE'
+                condition_census = (
+                    (self.df_excel['Census Reconciliation'] == 'BILLED') |
+                    (self.df_excel['Census Reconciliation'] == 'LWBS') |
+                    (self.df_excel['Census Reconciliation'] == 'AMA')
+                )
+                condition_status = self.df_excel['Status'].astype(str).str.upper() == 'OPEN'
+
+                self.df_excel.loc[condition_census & condition_status, 'Status'] = 'DE_COMPLETE'
 
 
             # Save processed file
