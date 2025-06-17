@@ -8,8 +8,6 @@ import os
 from dotenv import load_dotenv
 import traceback
 from collections import defaultdict
-import time
-
 
 load_dotenv()
 ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
@@ -17,7 +15,6 @@ VIEW_ID = os.getenv("VIEW_ID")
 TABLEAU_SERVER = os.getenv("TABLEAU_SERVER")
 TOKEN_NAME = os.getenv("TOKEN_NAME")
 SITE_ID = os.getenv("SITE_ID")
-
 
 class TableauApp(tb.Window):
     def __init__(self):
@@ -117,10 +114,6 @@ class TableauApp(tb.Window):
                 name_list = []
                 for _, row in df_tableau.iterrows():
                     last = str(row['Last Name']).strip().upper()
-                    if last.startswith("LAB"):
-                        if last not in name_list:
-                            name_list.append(last)
-                            print(last)
                     first = str(row['FirstName']).strip().upper()
                     code = str(row['Charge Code']).strip().upper()
                     self.charge_code_lookup[(last, first)].append(code)
