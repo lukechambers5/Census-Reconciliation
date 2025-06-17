@@ -158,8 +158,6 @@ class TableauApp(tb.Window):
                 first = str(row.get('First Name', '')).strip().upper()
                 key = (last, first)
                 code = self.charge_code_lookup.get(key, '').strip().upper()
-
-                # Default values
                 census_rec = ""
 
                 if code == "LWBS":
@@ -174,7 +172,7 @@ class TableauApp(tb.Window):
                     census_rec = "BILLED"
                 else:
                     code = ""
-                    census_rec = ""
+                    census_rec = "#N/A"
 
                 return pd.Series([code, census_rec])
 
