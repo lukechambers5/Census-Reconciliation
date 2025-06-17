@@ -7,6 +7,9 @@ import tableauserverclient as TSC
 import os
 from dotenv import load_dotenv
 import traceback
+from collections import defaultdict
+import time
+
 
 load_dotenv()
 ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
@@ -23,7 +26,8 @@ class TableauApp(tb.Window):
         self.geometry("1100x750")
         self.resizable(False, False)
 
-        self.charge_code_lookup = None
+        self.charge_code_lookup = defaultdict(list)
+
 
         # Header Frame
         header_frame = tb.Frame(self)
@@ -91,18 +95,35 @@ class TableauApp(tb.Window):
                     return
                 self.output_text.insert("end", "Found the target view!\n")
 
-                server.views.populate_csv(target_view)
+                req_option = TSC.CSVRequestOptions()
+                req_option.max_rows = -1
+                req_option.include_all_columns = True
+
+                req_option.vf("Charge Code", "") 
+                req_option.vf("Last Name", "") 
+
+                server.views.populate_csv(target_view, req_options=req_option)
+
                 csv_bytes = b"".join(target_view.csv)
-                df_tableau = pd.read_csv(BytesIO(csv_bytes))
+                df_tableau = pd.read_csv(BytesIO(csv_bytes), on_bad_lines='warn', engine="python")
+                self.output_text.insert("end", f"Retrieved {len(df_tableau)} rows from Tableau.\n")
+
 
                 required_cols = ['Last Name', 'FirstName', 'Charge Code']
                 missing_cols = [col for col in required_cols if col not in df_tableau.columns]
                 if missing_cols:
                     self.output_text.insert("end", f"Tableau data missing columns: {missing_cols}\n")
                     return
-                
-                self.charge_code_lookup = df_tableau.set_index(['Last Name', 'FirstName'])['Charge Code'].to_dict()
-                self.output_text.insert("end", f"Tableau data fetched successfully with {len(self.charge_code_lookup)} records.\n")
+                name_list = []
+                for _, row in df_tableau.iterrows():
+                    last = str(row['Last Name']).strip().upper()
+                    if last.startswith("LAB"):
+                        if last not in name_list:
+                            name_list.append(last)
+                            print(last)
+                    first = str(row['FirstName']).strip().upper()
+                    code = str(row['Charge Code']).strip().upper()
+                    self.charge_code_lookup[(last, first)].append(code)
 
         except Exception as e:
             self.output_text.insert("end", f"Tableau fetch failed: {e}\n")
@@ -157,7 +178,9 @@ class TableauApp(tb.Window):
                 last = str(row.get('Last Name', '')).strip().upper()
                 first = str(row.get('First Name', '')).strip().upper()
                 key = (last, first)
-                code = self.charge_code_lookup.get(key, '').strip().upper()
+
+                codes = self.charge_code_lookup.get(key, [])
+                code = next((c for c in codes if c.startswith("99")), codes[0] if codes else '')
                 census_rec = ""
 
                 if code == "LWBS":
@@ -171,7 +194,6 @@ class TableauApp(tb.Window):
                 elif code.startswith("99"):
                     census_rec = "BILLED"
                 else:
-                    code = ""
                     census_rec = "#N/A"
 
                 return pd.Series([code, census_rec])
