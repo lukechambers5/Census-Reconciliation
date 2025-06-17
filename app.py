@@ -24,7 +24,8 @@ class TableauApp(tb.Window):
         self.resizable(False, False)
 
         self.charge_code_lookup = defaultdict(list)
-
+        self.dos_lookup = defaultdict(list)
+        self.appointment_num_lookup = defaultdict(list)
 
         # Header Frame
         header_frame = tb.Frame(self)
@@ -111,19 +112,22 @@ class TableauApp(tb.Window):
                 if missing_cols:
                     self.output_text.insert("end", f"Tableau data missing columns: {missing_cols}\n")
                     return
-                name_list = []
                 for _, row in df_tableau.iterrows():
                     last = str(row['Last Name']).strip().upper()
                     first = str(row['FirstName']).strip().upper()
                     code = str(row['Charge Code']).strip().upper()
+                    dos = str(row['DOS']).strip()
+                    appointment_num = str(row['Appointment Number']).strip()
                     self.charge_code_lookup[(last, first)].append(code)
+                    self.dos_lookup[(last, first)].append(dos)
+                    self.appointment_num_lookup[(last, first)].append(appointment_num)
 
         except Exception as e:
             self.output_text.insert("end", f"Tableau fetch failed: {e}\n")
             self.output_text.insert("end", traceback.format_exc())
 
     def upload_file(self):
-        if self.charge_code_lookup is None:
+        if self.charge_code_lookup is None or self.dos_lookup is None or appointment_num_lookup is None:
             messagebox.showwarning("Data Missing", "Please fetch Tableau data before uploading Excel file.")
             return
 
@@ -150,7 +154,9 @@ class TableauApp(tb.Window):
 
             # Create ID1, ID2, ID3 columns
             if 'Date of Service' in self.df_excel.columns and 'Patient DOB' in self.df_excel.columns and 'Last Name' in self.df_excel.columns and 'Patient MRN' in self.df_excel.columns:
+                self.df_excel["Date of Service"] = pd.to_datetime(self.df_excel["Date of Service"], errors="coerce").dt.normalize()
                 excel_serial_DOS = (self.df_excel["Date of Service"] - pd.Timestamp("1899-12-30")).dt.days
+                self.df_excel["Patient DOB"] = pd.to_datetime(self.df_excel["Patient DOB"], errors="coerce").dt.normalize()
                 excel_serial_DOB = (self.df_excel["Patient DOB"] - pd.Timestamp("1899-12-30")).dt.days
                 self.df_excel.insert(0, 'ID1', self.df_excel["Patient MRN"].astype(str) + excel_serial_DOS.astype(str))
                 self.df_excel.insert(self.df_excel.columns.get_loc('ID1') + 1, 'ID2', excel_serial_DOS.astype(str) + excel_serial_DOB.astype(str) + self.df_excel["Last Name"])
@@ -171,7 +177,16 @@ class TableauApp(tb.Window):
                 last = str(row.get('Last Name', '')).strip().upper()
                 first = str(row.get('First Name', '')).strip().upper()
                 key = (last, first)
-
+                dates = self.dos_lookup.get(key, [])
+                date = dates[0] if dates else ""
+                if(last == "SUGGETT"):
+                    print(last + "'s date of service for Tableau: " + date)
+                    print(f"{last}'s date of service for Excel file: {row['Date of Service'].strftime('%m/%d/%Y') if pd.notnull(row['Date of Service']) else 'Invalid Date'}")
+                
+                appointment_nims = self.appointment_num_lookup.get(key, [])
+                appointment_num = appointment_nims[0] if appointment_nims else ""
+                if(last == "RAMIREZ" and first == "DAVID"):
+                    print(last + "'s appointment number for Tableau: " + appointment_num)                
                 codes = self.charge_code_lookup.get(key, [])
                 code = next((c for c in codes if c.startswith("99")), codes[0] if codes else '')
                 census_rec = ""
@@ -188,7 +203,6 @@ class TableauApp(tb.Window):
                     census_rec = "BILLED"
                 else:
                     census_rec = "#N/A"
-
                 return pd.Series([code, census_rec])
 
             self.df_excel[['E&M (Pro)', 'Census Reconciliation']] = self.df_excel.apply(get_charge_code_and_census, axis=1)
@@ -203,11 +217,11 @@ class TableauApp(tb.Window):
 
                 self.df_excel.loc[condition_census & condition_status, 'Status'] = 'DE_COMPLETE'
 
-
             # Save processed file
             from pathlib import Path
             new_file_path = Path(file_path).with_name(f"PROCESSED______{Path(file_path).stem}.xlsx")
-            self.df_excel.to_excel(new_file_path, index=False)
+            with pd.ExcelWriter(new_file_path, engine='xlsxwriter', datetime_format='mm/dd/yyyy') as writer:
+                self.df_excel.to_excel(writer, index=False)
 
             # Update preview
             self.excel_preview.delete("1.0", "end")
