@@ -177,36 +177,46 @@ class TableauApp(tb.Window):
                 key = (last, first)
 
                 encounters = self.encounter_lookup.get(key, [])
-
+                use_code = ""
                 if encounters:
                     for appt_id, code_dos_set in encounters.items():
                         for code, dos in code_dos_set:
-                            if code.startswith("99"):
-                                tableau_dos = dos
-                                #print("99 Visit:", last, first, ":", appt_id, code, tableau_dos)
-                                dos = row['Date of Service']
-                                if pd.notnull(dos):
-                                    print(f"{dos.month}/{dos.day}/{dos.year}")
+                            tableau_dos = dos
+                            dos = row['Date of Service']
+                            if pd.notnull(dos):
+                                excel_dos = f"{dos.month}/{dos.day}/{dos.year}"
+                            else:
+                                print("Invalid Date")
+                            if(tableau_dos == excel_dos):
+                                if(last == "MOORE" and first == "JACOB"):
+                                    print(code, tableau_dos, excel_dos)
+                                if code.startswith("99") or code == "LWBS" or code == "AMA" or code == "0" or code == "NULL":
+                                    use_code = code
+                                    continue
                                 else:
-                                    print("Invalid Date")
-
+                                    use_code = ""
+                            else:
+                                use_code = ""
+                            
                 else:
                     date_str = ""
                     appointment_num_str = ""
+
+                
                 census_rec = ""
-                if code == "LWBS":
+                if use_code == "LWBS":
                     census_rec = "LWBS"
-                elif code == "AMA":
+                elif use_code == "AMA":
                     census_rec = "AMA"
-                elif code == "0":
+                elif use_code == "0":
                     census_rec = "NON ED ENCOUNTERS"
-                elif code == "NULL":
+                elif use_code == "NULL":
                     census_rec = ""
-                elif code.startswith("99"):
+                elif use_code.startswith("99"):
                     census_rec = "BILLED"
                 else:
                     census = '#N/A'
-                return pd.Series([code, census_rec])
+                return pd.Series([use_code, census_rec])
 
             self.df_excel[['E&M (Pro)', 'Census Reconciliation']] = self.df_excel.apply(get_encounter, axis=1)
  
