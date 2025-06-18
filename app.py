@@ -23,7 +23,8 @@ class TableauApp(tb.Window):
         self.geometry("1100x750")
         self.resizable(False, False)
 
-        self.encounter_lookup = defaultdict(set)
+        self.encounter_lookup = defaultdict(lambda: defaultdict(set))
+
 
 
         # Header Frame
@@ -116,7 +117,7 @@ class TableauApp(tb.Window):
                     code = str(row['Charge Code']).strip().upper()
                     dos = str(row['DOS']).strip()
                     appointment_num = str(row['Appointment FID']).strip()
-                    self.encounter_lookup[(last, first)].add((code, dos, appointment_num))
+                    self.encounter_lookup[(last, first)][appointment_num].add((code, dos))
 
         except Exception as e:
             self.output_text.insert("end", f"Tableau fetch failed: {e}\n")
@@ -177,31 +178,22 @@ class TableauApp(tb.Window):
 
                 encounters = self.encounter_lookup.get(key, [])
 
-                def format_date(d):
-                    if pd.isnull(d):
-                        return None
-                    if isinstance(d, str):
-                        d = pd.to_datetime(d, errors='coerce')
-                    return d.strftime('%m/%d/%Y') if pd.notnull(d) else None
-
                 if encounters:
-                    dates = sorted({format_date(dos) for code, dos, appt in encounters if dos})
-                    dates = list(filter(None, dates))  # Remove any Nones caused by invalid dates
-                    appointment_nums = sorted({appt for code, dos, appt in encounters if appt})
-                    codes = sorted({code for code, dos, appt in encounters if code})
+                    for appt_id, code_dos_set in encounters.items():
+                        for code, dos in code_dos_set:
+                            if code.startswith("99"):
+                                tableau_dos = dos
+                                #print("99 Visit:", last, first, ":", appt_id, code, tableau_dos)
+                                dos = row['Date of Service']
+                                if pd.notnull(dos):
+                                    print(f"{dos.month}/{dos.day}/{dos.year}")
+                                else:
+                                    print("Invalid Date")
 
                 else:
                     date_str = ""
                     appointment_num_str = ""
-
-                # Debug print for specific person
-                if last == "RAMIREZ" and first == "DAVID":
-                    print(f"{last}'s date(s) of service for Tableau: {dates[0]}")
-                    print(f"{last}'s date of service for Excel file: {row['Date of Service'].strftime('%m/%d/%Y') if pd.notnull(row['Date of Service']) else 'Invalid Date'}")
-                    print(f"{last}'s appointment number(s) for Tableau: {appointment_nums[0]}")
-                    print(f"{last}'s 99-code(s) for Tableau: {codes[0]}")          
                 census_rec = ""
-                code = codes[0]
                 if code == "LWBS":
                     census_rec = "LWBS"
                 elif code == "AMA":
@@ -217,7 +209,7 @@ class TableauApp(tb.Window):
                 return pd.Series([code, census_rec])
 
             self.df_excel[['E&M (Pro)', 'Census Reconciliation']] = self.df_excel.apply(get_encounter, axis=1)
-
+ 
             if 'Status' in self.df_excel.columns:
                 condition_census = (
                     (self.df_excel['Census Reconciliation'] == 'BILLED') |
