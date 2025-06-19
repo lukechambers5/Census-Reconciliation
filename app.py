@@ -1,20 +1,11 @@
 import ttkbootstrap as tb
 from ttkbootstrap.constants import *
-from tkinter import filedialog, messagebox
-import pandas as pd
-from io import BytesIO
-import tableauserverclient as TSC
+from tkinter import messagebox, filedialog
 import os
-from dotenv import load_dotenv
-import traceback
+import threading
 from collections import defaultdict
-
-load_dotenv()
-ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
-VIEW_ID = os.getenv("VIEW_ID")
-TABLEAU_SERVER = os.getenv("TABLEAU_SERVER")
-TOKEN_NAME = os.getenv("TOKEN_NAME")
-SITE_ID = os.getenv("SITE_ID")
+from tableau_fetch import TableauFetcher
+from excel_processing import process_excel_file
 
 class TableauApp(tb.Window):
     def __init__(self):
@@ -24,96 +15,99 @@ class TableauApp(tb.Window):
         self.resizable(False, False)
 
         self.encounter_lookup = defaultdict(lambda: defaultdict(list))
+        self.df_tableau = None
 
+        # UI setup here (same as before)...
+        # (site dropdown, buttons, progress bar, output text)
 
-
-        # Header Frame
-        header_frame = tb.Frame(self)
-        header_frame.pack(fill=X, padx=0, pady=(0, 10))
-        tb.Label(
-            header_frame,
-            text="Census Reconciliation Tool",
-            font=("Segoe UI", 20, "bold"),
-        ).pack(side=TOP, padx=20, pady=15)
-
-        # Main Content Frame
-        main_frame = tb.Frame(self)
-        main_frame.pack(fill=BOTH, expand=True, padx=20, pady=10)
-
-        # Center Panel (Actions)
-        center_panel = tb.Frame(main_frame)
-        center_panel.pack(side=TOP, fill=Y, padx=(0, 20), pady=0)
-
-        self.fetch_btn = tb.Button(
-            center_panel,
-            text="Fetch Tableau View",
-            width=22,
-            command=self.fetch_tableau_data
+        # Create TableauFetcher instance with UI callbacks
+        self.fetcher = TableauFetcher(
+            output_callback=self.append_output,
+            progress_callback=self.update_progress
         )
-        self.fetch_btn.pack(pady=(0, 15), anchor="n")
 
-        self.upload_btn = tb.Button(
-            center_panel,
-            text="Upload Excel File",
-            width=22,
-            command=self.upload_file
+        # Set button commands
+        # Dropdown
+        self.site_choice = tb.StringVar(value="Select Client")
+        self.site_dropdown = tb.Combobox(
+            self,
+            textvariable=self.site_choice,
+            values=["Larkin", "Elite"],
+            state="readonly",
+            width=20
         )
-        self.upload_btn.pack(pady=(0, 15), anchor="n")
+        self.site_dropdown.pack(pady=10)
 
-        # Output Text (Status/Logs)
-        tb.Label(center_panel, text="Status Log:", font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(10, 0))
-        self.output_text = tb.ScrolledText(center_panel, height=13, width=35, font=("Consolas", 9))
-        self.output_text.pack(fill=X, pady=(0, 10), padx=0)
+        # Progress bar
+        self.progress = tb.Progressbar(
+            self,
+            mode="determinate",
+            bootstyle="success",
+            length=300
+        )
+        self.progress.pack(pady=10)
+
+        # Output text area
+        self.output_text = tb.ScrolledText(self, height=13, width=55, font=("Consolas", 9))
+        self.output_text.pack(pady=10)
+
+        # ✅ Define the buttons
+        self.fetch_btn = tb.Button(self, text="Fetch Tableau View")
+        self.fetch_btn.pack(pady=(0, 10))
+
+        self.upload_btn = tb.Button(self, text="Upload Excel File")
+        self.upload_btn.pack(pady=(0, 10))
+
+        # ✅ THEN you can safely configure them
+        self.fetch_btn.configure(command=self.fetch_tableau_data)
+        self.upload_btn.configure(command=self.upload_file_with_license)
+
+
+    def append_output(self, text):
+        self.output_text.after(0, lambda: self.output_text.insert("end", text))
+
+    def update_progress(self, val):
+        self.progress.after(0, lambda: self.progress.config(value=val))
 
     def fetch_tableau_data(self):
         self.output_text.delete("1.0", "end")
         self.output_text.insert("end", "Connecting to Tableau...\n")
         self.update()
 
-        tableau_auth = TSC.PersonalAccessTokenAuth(TOKEN_NAME, ACCESS_TOKEN, SITE_ID)
-        server = TSC.Server(TABLEAU_SERVER, use_server_version=True)
+        site = self.site_choice.get()
+        if site == "Larkin":
+            license_key = "137797"
+        elif site == "Elite":
+            license_key = "160214"
+        else:
+            self.output_text.insert("end", "Please select a site (Larkin or Elite).\n")
+            return
 
-        try:
-            with server.auth.sign_in(tableau_auth):
-                target_view = server.views.get_by_id(VIEW_ID)
-                if not target_view:
-                    self.output_text.insert("end", "Target view not found.\n")
-                    return
-                self.output_text.insert("end", "Found the target view!\n")
+        self.progress.configure(mode="determinate", maximum=100)
+        self.progress['value'] = 0
+        self.progress.update()
 
-                req_option = TSC.CSVRequestOptions()
-                req_option.max_rows = -1
-                req_option.include_all_columns = True
+        def run():
+            df = self.fetcher.fetch_data(license_key)
+            if df is not None:
+                self.df_tableau = df
+                self.encounter_lookup = self.fetcher.encounter_lookup
 
-                req_option.vf("Charge Code", "") 
-                req_option.vf("Last Name", "") 
+        threading.Thread(target=run, daemon=True).start()
 
-                server.views.populate_csv(target_view, req_options=req_option)
+    def upload_file_with_license(self):
+        site = self.site_choice.get()
+        if site == "Larkin":
+            license_key = "137797"
+        elif site == "Elite":
+            license_key = "160214"
+        else:
+            self.output_text.insert("end", "Please select a site (Larkin or Elite).\n")
+            return
 
-                csv_bytes = b"".join(target_view.csv)
-                df_tableau = pd.read_csv(BytesIO(csv_bytes), on_bad_lines='warn', engine="python")
-                self.output_text.insert("end", f"Retrieved {len(df_tableau)} rows from Tableau.\n")
+        self.upload_file(license_key)
 
-                required_cols = ['Last Name', 'FirstName', 'Charge Code']
-                missing_cols = [col for col in required_cols if col not in df_tableau.columns]
-                if missing_cols:
-                    self.output_text.insert("end", f"Tableau data missing columns: {missing_cols}\n")
-                    return
-                for _, row in df_tableau.iterrows():
-                    last = str(row['Last Name']).strip().upper()
-                    first = str(row['FirstName']).strip().upper()
-                    code = str(row['Charge Code']).strip().upper()
-                    dos = str(row['DOS']).strip()
-                    appointment_num = str(row['Appointment FID']).strip()
-                    if (code, dos) not in self.encounter_lookup[(last, first)][appointment_num]:
-                        self.encounter_lookup[(last, first)][appointment_num].append((code, dos))
-
-        except Exception as e:
-            self.output_text.insert("end", f"Tableau fetch failed: {e}\n")
-            print("end", f"Tableau fetch failed: {e}\n")
-            self.output_text.insert("end", traceback.format_exc())
-
-    def upload_file(self):
+    def upload_file(self, license_key):
         if self.encounter_lookup is None:
             messagebox.showwarning("Data Missing", "Please fetch Tableau data before uploading Excel file.")
             return
@@ -122,114 +116,20 @@ class TableauApp(tb.Window):
         if not file_path:
             return
 
-        try:
-            self.df_excel = pd.read_excel(file_path)
-
-            # Convert 'Date of Service' to datetime
-            if 'Date of Service' in self.df_excel.columns:
-                self.df_excel['Date of Service'] = pd.to_datetime(self.df_excel['Date of Service'], errors='coerce')
-
-            # Split 'Patient Name' into Last Name and First Name
-            if 'Patient Name' in self.df_excel.columns:
-                names_split = self.df_excel['Patient Name'].astype(str).str.split(',', n=1, expand=True)
-                last_name_col = names_split[0].str.strip()
-                first_name_col = names_split[1].str.strip() if names_split.shape[1] > 1 else ''
-
-                patient_name_index = self.df_excel.columns.get_loc('Patient Name')
-                self.df_excel.insert(patient_name_index + 1, 'Last Name', last_name_col)
-                self.df_excel.insert(patient_name_index + 2, 'First Name', first_name_col)
-
-            # Create ID1, ID2, ID3 columns
-            if 'Date of Service' in self.df_excel.columns and 'Patient DOB' in self.df_excel.columns and 'Last Name' in self.df_excel.columns and 'Patient MRN' in self.df_excel.columns:
-                self.df_excel["Date of Service"] = pd.to_datetime(self.df_excel["Date of Service"], errors="coerce").dt.normalize()
-                excel_serial_DOS = (self.df_excel["Date of Service"] - pd.Timestamp("1899-12-30")).dt.days
-                self.df_excel["Patient DOB"] = pd.to_datetime(self.df_excel["Patient DOB"], errors="coerce").dt.normalize()
-                excel_serial_DOB = (self.df_excel["Patient DOB"] - pd.Timestamp("1899-12-30")).dt.days
-                self.df_excel.insert(0, 'ID1', self.df_excel["Patient MRN"].astype(str) + excel_serial_DOS.astype(str))
-                self.df_excel.insert(self.df_excel.columns.get_loc('ID1') + 1, 'ID2', excel_serial_DOS.astype(str) + excel_serial_DOB.astype(str) + self.df_excel["Last Name"])
-                self.df_excel.insert(self.df_excel.columns.get_loc('ID2') + 1, 'ID3', '')  # Placeholder for ID3
-            else:
-                self.output_text.insert("end", "Missing columns required for ID generation.\n")
-
-            # Add empty columns for reconciliation status
-            self.df_excel["Census Reconciliation"] = ""
-            self.df_excel["UNBILLED"] = ""
-
-            # Ensure 'E&M (Pro)' column exists
-            if 'E&M (Pro)' not in self.df_excel.columns:
-                self.df_excel['E&M (Pro)'] = ""
-
-            # Update 'E&M (Pro)' based on Tableau charge codes
-            def get_encounter(row):
-                last = str(row.get('Last Name', '')).strip().upper()
-                first = str(row.get('First Name', '')).strip().upper()
-                key = (last, first)
-
-                encounters = self.encounter_lookup.get(key, [])
-                use_code = ""
-                census_rec = ""
-                status = "OPEN"
-                
-
-                # encounters would be a dictionary - (last, first) = {appt_id id : {code, dos}}, {appointment id : {code, dos}}
-                if encounters:
-                    for appt_id, code_dos_set in encounters.items():
-                        if(use_code != ""):
-                            break
-                        for code, dos in code_dos_set:
-                            tableau_dos = dos
-                            dos = row['Date of Service']
-                            if pd.notnull(dos):
-                                excel_dos = f"{dos.month}/{dos.day}/{dos.year}"
-                            if(tableau_dos == excel_dos):
-                                if code.startswith("99") or code == "LWBS" or code == "AMA" or code == "0" or code == "NULL":
-                                    status = "OPEN"
-                                    use_code = code
-                                    break
-                                else:
-                                    status = 'INVALID CHARGE CODE'
-                            else:
-                                status = "MISMATCH DOS"
-                else:
-                    status = "NAME NOT FOUND"
-                if use_code == "LWBS":
-                    census_rec = "LWBS"
-                elif use_code == "AMA":
-                    census_rec = "AMA"
-                elif use_code == "0":
-                    census_rec = "NON ED ENCOUNTERS"
-                elif use_code == "NULL":
-                    census_rec = ""
-                elif use_code.startswith("99"):
-                    census_rec = "BILLED"
-                else:
-                    census = '#N/A'
-                return pd.Series([use_code, census_rec, status])
-
-            self.df_excel[['E&M (Pro)', 'Census Reconciliation', 'Status']] = self.df_excel.apply(get_encounter, axis=1)
- 
-            condition = (
-                self.df_excel['Status'].str.upper() == 'OPEN'
-            ) & (
-                self.df_excel['Census Reconciliation'].isin(['BILLED', 'LWBS', 'AMA'])
+        def run_process():
+            processed_path = process_excel_file(
+                file_path,
+                license_key,
+                encounter_lookup=self.encounter_lookup,
+                df_tableau=self.df_tableau,
+                output_callback=self.append_output
             )
-            self.df_excel.loc[condition, 'Status'] = 'DE_COMPLETE'
+            if processed_path:
+                if messagebox.askyesno("Open File", f"Processed file saved:\n{processed_path}\n\nDo you want to open it?"):
+                    os.startfile(processed_path)
 
-            # Save processed file
-            from pathlib import Path
-            new_file_path = Path(file_path).with_name(f"PROCESSED______{Path(file_path).stem}.xlsx")
-            with pd.ExcelWriter(new_file_path, engine='xlsxwriter', datetime_format='mm/dd/yyyy') as writer:
-                self.df_excel.to_excel(writer, index=False)
-
-            if messagebox.askyesno("Open File", f"Processed file saved:\n{new_file_path}\n\nDo you want to open it?"):
-                os.startfile(new_file_path)
-
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to load/process Excel file:\n{e}")
-            self.output_text.insert("end", traceback.format_exc())
-
+        threading.Thread(target=run_process, daemon=True).start()
 
 if __name__ == "__main__":
     app = TableauApp()
     app.mainloop()
-    
