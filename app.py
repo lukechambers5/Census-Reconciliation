@@ -20,10 +20,10 @@ class TableauApp(tb.Window):
     def __init__(self):
         super().__init__(themename="cyborg")
         self.title("Census Reconciliation Tool")
-        self.geometry("1100x750")
+        self.geometry("500x550")
         self.resizable(False, False)
 
-        self.encounter_lookup = defaultdict(lambda: defaultdict(set))
+        self.encounter_lookup = defaultdict(lambda: defaultdict(list))
 
 
 
@@ -33,19 +33,19 @@ class TableauApp(tb.Window):
         tb.Label(
             header_frame,
             text="Census Reconciliation Tool",
-            font=("Segoe UI", 22, "bold"),
-        ).pack(side=LEFT, padx=20, pady=15)
+            font=("Segoe UI", 20, "bold"),
+        ).pack(side=TOP, padx=20, pady=15)
 
         # Main Content Frame
         main_frame = tb.Frame(self)
         main_frame.pack(fill=BOTH, expand=True, padx=20, pady=10)
 
-        # Left Panel (Actions)
-        left_panel = tb.Frame(main_frame)
-        left_panel.pack(side=LEFT, fill=Y, padx=(0, 20), pady=0)
+        # Center Panel (Actions)
+        center_panel = tb.Frame(main_frame)
+        center_panel.pack(side=TOP, fill=Y, padx=(0, 20), pady=0)
 
         self.fetch_btn = tb.Button(
-            left_panel,
+            center_panel,
             text="Fetch Tableau View",
             width=22,
             command=self.fetch_tableau_data
@@ -53,7 +53,7 @@ class TableauApp(tb.Window):
         self.fetch_btn.pack(pady=(0, 15), anchor="n")
 
         self.upload_btn = tb.Button(
-            left_panel,
+            center_panel,
             text="Upload Excel File",
             width=22,
             command=self.upload_file
@@ -61,21 +61,9 @@ class TableauApp(tb.Window):
         self.upload_btn.pack(pady=(0, 15), anchor="n")
 
         # Output Text (Status/Logs)
-        tb.Label(left_panel, text="Status Log:", font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(10, 0))
-        self.output_text = tb.ScrolledText(left_panel, height=13, width=35, font=("Consolas", 9))
+        tb.Label(center_panel, text="Status Log:", font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(10, 0))
+        self.output_text = tb.ScrolledText(center_panel, height=13, width=35, font=("Consolas", 9))
         self.output_text.pack(fill=X, pady=(0, 10), padx=0)
-
-        # Right Panel (Excel Preview)
-        right_panel = tb.Frame(main_frame)
-        right_panel.pack(side=LEFT, fill=BOTH, expand=True)
-
-        tb.Label(right_panel, text="Excel Preview:", font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 5))
-        self.excel_preview = tb.ScrolledText(
-            right_panel,
-            height=30,
-            font=("Consolas", 10),
-        )
-        self.excel_preview.pack(fill=BOTH, expand=True, padx=0, pady=0)
 
     def fetch_tableau_data(self):
         self.output_text.delete("1.0", "end")
@@ -117,7 +105,8 @@ class TableauApp(tb.Window):
                     code = str(row['Charge Code']).strip().upper()
                     dos = str(row['DOS']).strip()
                     appointment_num = str(row['Appointment FID']).strip()
-                    self.encounter_lookup[(last, first)][appointment_num].add((code, dos))
+                    if (code, dos) not in self.encounter_lookup[(last, first)][appointment_num]:
+                        self.encounter_lookup[(last, first)][appointment_num].append((code, dos))
 
         except Exception as e:
             self.output_text.insert("end", f"Tableau fetch failed: {e}\n")
@@ -169,7 +158,7 @@ class TableauApp(tb.Window):
             # Ensure 'E&M (Pro)' column exists
             if 'E&M (Pro)' not in self.df_excel.columns:
                 self.df_excel['E&M (Pro)'] = ""
-            census_rec = ""
+
             # Update 'E&M (Pro)' based on Tableau charge codes
             def get_encounter(row):
                 last = str(row.get('Last Name', '')).strip().upper()
@@ -178,32 +167,31 @@ class TableauApp(tb.Window):
 
                 encounters = self.encounter_lookup.get(key, [])
                 use_code = ""
+                census_rec = ""
+                status = "OPEN"
+                
+
+                # encounters would be a dictionary - (last, first) = {appt_id id : {code, dos}}, {appointment id : {code, dos}}
                 if encounters:
                     for appt_id, code_dos_set in encounters.items():
+                        if(use_code != ""):
+                            break
                         for code, dos in code_dos_set:
                             tableau_dos = dos
                             dos = row['Date of Service']
                             if pd.notnull(dos):
                                 excel_dos = f"{dos.month}/{dos.day}/{dos.year}"
-                            else:
-                                print("Invalid Date")
                             if(tableau_dos == excel_dos):
-                                if(last == "MOORE" and first == "JACOB"):
-                                    print(code, tableau_dos, excel_dos)
                                 if code.startswith("99") or code == "LWBS" or code == "AMA" or code == "0" or code == "NULL":
+                                    status = "OPEN"
                                     use_code = code
-                                    continue
+                                    break
                                 else:
-                                    use_code = ""
+                                    status = 'INVALID CHARGE CODE'
                             else:
-                                use_code = ""
-                            
+                                status = "MISMATCH DOS"
                 else:
-                    date_str = ""
-                    appointment_num_str = ""
-
-                
-                census_rec = ""
+                    status = "NAME NOT FOUND"
                 if use_code == "LWBS":
                     census_rec = "LWBS"
                 elif use_code == "AMA":
@@ -216,29 +204,22 @@ class TableauApp(tb.Window):
                     census_rec = "BILLED"
                 else:
                     census = '#N/A'
-                return pd.Series([use_code, census_rec])
+                return pd.Series([use_code, census_rec, status])
 
-            self.df_excel[['E&M (Pro)', 'Census Reconciliation']] = self.df_excel.apply(get_encounter, axis=1)
+            self.df_excel[['E&M (Pro)', 'Census Reconciliation', 'Status']] = self.df_excel.apply(get_encounter, axis=1)
  
-            if 'Status' in self.df_excel.columns:
-                condition_census = (
-                    (self.df_excel['Census Reconciliation'] == 'BILLED') |
-                    (self.df_excel['Census Reconciliation'] == 'LWBS') |
-                    (self.df_excel['Census Reconciliation'] == 'AMA')
-                )
-                condition_status = self.df_excel['Status'].astype(str).str.upper() == 'OPEN'
-
-                self.df_excel.loc[condition_census & condition_status, 'Status'] = 'DE_COMPLETE'
+            condition = (
+                self.df_excel['Status'].str.upper() == 'OPEN'
+            ) & (
+                self.df_excel['Census Reconciliation'].isin(['BILLED', 'LWBS', 'AMA'])
+            )
+            self.df_excel.loc[condition, 'Status'] = 'DE_COMPLETE'
 
             # Save processed file
             from pathlib import Path
             new_file_path = Path(file_path).with_name(f"PROCESSED______{Path(file_path).stem}.xlsx")
             with pd.ExcelWriter(new_file_path, engine='xlsxwriter', datetime_format='mm/dd/yyyy') as writer:
                 self.df_excel.to_excel(writer, index=False)
-
-            # Update preview
-            self.excel_preview.delete("1.0", "end")
-            self.excel_preview.insert("end", self.df_excel.head(20).to_string())
 
             if messagebox.askyesno("Open File", f"Processed file saved:\n{new_file_path}\n\nDo you want to open it?"):
                 os.startfile(new_file_path)
