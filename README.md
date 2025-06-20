@@ -1,7 +1,6 @@
 # Tableau Census Reconciliation Tool
 
-This internal-use Python app reconciles hospital Excel records with Tableau census data. It connects to a Tableau view, pulls patient charge codes, and automatically applies reconciliation rules to uploaded Excel files—identifying billed, unbilled, LWBS, and AMA cases.
-
+This internal-use Python application streamlines reconciliation of hospital Excel records with Tableau census data. It connects securely to Tableau, fetches patient encounter details, and applies automated matching and validation rules to uploaded Excel files, generating a reconciled output with status flags, calculated IDs, and charge code evaluations.
 ---
 
 ![App Screenshot](assets/census_rec_ss.png)
