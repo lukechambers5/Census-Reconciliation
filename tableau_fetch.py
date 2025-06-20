@@ -7,6 +7,7 @@ from config import ACCESS_TOKEN, VIEW_ID, TABLEAU_SERVER, TOKEN_NAME, SITE_ID
 class TableauFetcher:
     def __init__(self, output_callback=None, progress_callback=None):
         self.encounter_lookup = defaultdict(lambda: defaultdict(list))
+        self.patient_info_lookup = {}
         self.df_tableau = None
         self.output_callback = output_callback
         self.progress_callback = progress_callback
@@ -55,6 +56,14 @@ class TableauFetcher:
                     code = str(row['Charge Code']).strip().upper()
                     dos = str(row['DOS']).strip()
                     appointment_num = str(row['Appointment FID']).strip()
+                    dob = str(row['DOB']).strip()
+                    mrn = str(row['Chart Number']).strip();
+                    name_key = (last, first)
+                    if name_key not in self.patient_info_lookup:
+                        self.patient_info_lookup[name_key] = {
+                            "dob": dob,
+                            "mrn": mrn
+                        }
                     if (code, dos) not in self.encounter_lookup[(last, first)][appointment_num]:
                         self.encounter_lookup[(last, first)][appointment_num].append((code, dos))
 

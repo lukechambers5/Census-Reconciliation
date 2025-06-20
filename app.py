@@ -5,6 +5,7 @@ import os
 import threading
 from collections import defaultdict
 from tableau_fetch import TableauFetcher
+import tableau_fetch
 from excel_processing import process_excel_file
 
 class TableauApp(tb.Window):
@@ -17,16 +18,12 @@ class TableauApp(tb.Window):
         self.encounter_lookup = defaultdict(lambda: defaultdict(list))
         self.df_tableau = None
 
-        # UI setup here (same as before)...
-        # (site dropdown, buttons, progress bar, output text)
-
         # Create TableauFetcher instance with UI callbacks
         self.fetcher = TableauFetcher(
             output_callback=self.append_output,
             progress_callback=self.update_progress
         )
 
-        # Set button commands
         # Dropdown
         self.site_choice = tb.StringVar(value="Select Client")
         self.site_dropdown = tb.Combobox(
@@ -46,22 +43,19 @@ class TableauApp(tb.Window):
             length=300
         )
         self.progress.pack(pady=10)
-
+    
         # Output text area
         self.output_text = tb.ScrolledText(self, height=13, width=55, font=("Consolas", 9))
         self.output_text.pack(pady=10)
 
-        # ✅ Define the buttons
         self.fetch_btn = tb.Button(self, text="Fetch Tableau View")
         self.fetch_btn.pack(pady=(0, 10))
 
         self.upload_btn = tb.Button(self, text="Upload Excel File")
         self.upload_btn.pack(pady=(0, 10))
 
-        # ✅ THEN you can safely configure them
         self.fetch_btn.configure(command=self.fetch_tableau_data)
         self.upload_btn.configure(command=self.upload_file_with_license)
-
 
     def append_output(self, text):
         self.output_text.after(0, lambda: self.output_text.insert("end", text))
@@ -115,6 +109,7 @@ class TableauApp(tb.Window):
         file_path = filedialog.askopenfilename(filetypes=[("Excel files", "*.xlsx *.xls")])
         if not file_path:
             return
+        tableau_fetcher = self.fetcher
 
         def run_process():
             processed_path = process_excel_file(
@@ -122,7 +117,8 @@ class TableauApp(tb.Window):
                 license_key,
                 encounter_lookup=self.encounter_lookup,
                 df_tableau=self.df_tableau,
-                output_callback=self.append_output
+                output_callback=self.append_output,
+                tableau_fetcher=tableau_fetcher
             )
             if processed_path:
                 if messagebox.askyesno("Open File", f"Processed file saved:\n{processed_path}\n\nDo you want to open it?"):

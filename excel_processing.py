@@ -3,7 +3,8 @@ from pathlib import Path
 import os
 import traceback
 
-def process_excel_file(file_path, license_key, encounter_lookup=None, df_tableau=None, output_callback=None):
+def process_excel_file(file_path, license_key, encounter_lookup=None, df_tableau=None, output_callback=None, tableau_fetcher=None):
+
     try:
         df_excel = pd.read_excel(file_path)
         
@@ -20,7 +21,35 @@ def process_excel_file(file_path, license_key, encounter_lookup=None, df_tableau
             df_excel.insert(patient_name_index + 1, 'Last Name', last_name_col)
             df_excel.insert(patient_name_index + 2, 'First Name', first_name_col)
 
+        if(license_key == "137797"):
+            if 'Last Name' in df_excel.columns and 'First Name' in df_excel.columns:
+                if 'Patient Account #' in df_excel.columns:
+                    acct_index = df_excel.columns.get_loc('Patient Account #')
+                    df_excel.insert(acct_index + 1, 'Patient MRN', "")
+                    df_excel.insert(acct_index + 2, 'Patient DOB', "")
+                else:
+                    # Fallback
+                    df_excel['Patient MRN'] = ""
+                    df_excel['Patient DOB'] = ""
+                for idx, row in df_excel.iterrows():
+                    last = str(row["Last Name"]).strip().upper()
+                    first = str(row["First Name"]).strip().upper()
+                    key = (last, first)
 
+                    patient_info = tableau_fetcher.patient_info_lookup.get(key) 
+                    if patient_info:
+                        raw_dob = patient_info.get("dob", "")
+                        try:
+                            parsed_dob = pd.to_datetime(raw_dob, errors="coerce")
+                            if pd.notnull(parsed_dob):
+                                formatted_dob = parsed_dob.strftime("%m/%d/%Y")
+                            else:
+                                formatted_dob = ""
+                        except Exception:
+                            formatted_dob = ""
+
+                        df_excel.at[idx, "Patient DOB"] = formatted_dob
+                        df_excel.at[idx, "Patient MRN"] = patient_info.get("mrn", "")
         if(license_key == "160214"):
             # Create ID1, ID2, ID3 columns
             if all(col in df_excel.columns for col in ['Date of Service', 'Patient DOB', 'Last Name', 'Patient MRN']):
