@@ -35,9 +35,14 @@ def process_excel_file(file_path, license_key, encounter_lookup=None, df_tableau
                 for idx, row in df_excel.iterrows():
                     last = str(row["Last Name"]).strip().upper()
                     first = str(row["First Name"]).strip().upper()
-                    key = (last, first)
 
-                    patient_info = tableau_fetcher.patient_info_lookup.get(key) 
+                    patient_info = None
+                    if tableau_fetcher.patient_info_lookup:
+                        for (enc_last, enc_first), info in tableau_fetcher.patient_info_lookup.items():
+                            if enc_last == last and (first.startswith(enc_first) or enc_first in first):
+                                patient_info = info
+                                break 
+
                     if patient_info:
                         raw_dob = patient_info.get("dob", "")
                         try:
@@ -130,8 +135,49 @@ def process_excel_file(file_path, license_key, encounter_lookup=None, df_tableau
                 df_excel.loc[condition, 'Status'] = 'DE_COMPLETE'
 
             if(license_key == "137797"):
-                df_excel.loc[df_excel['Status'] == "DE_COMPLETE", 'Census Reconciliation'] = "BILLED"
+                def get_encounter(row):
+                    last = str(row.get('Last Name', '')).strip().upper()
+                    first = str(row.get('First Name', '')).strip().upper()
+                    key = (last, first)
 
+                    encounters = {}
+                    if encounter_lookup:
+                        for (enc_last, enc_first), value in encounter_lookup.items():
+                            if enc_last == last and (first.startswith(enc_first) or enc_first in first):
+                                encounters = value
+                                break
+                    census_rec = ""
+
+                    if encounters:
+                        matched = False
+                        for appt_id, code_dos_set in encounters.items():
+                            for code, dos in code_dos_set:
+                                tableau_dos = dos
+                                dos_excel = row['Date of Service']
+                                if pd.notnull(dos_excel):
+                                    excel_dos = f"{dos_excel.month}/{dos_excel.day}/{dos_excel.year}"
+                                    if tableau_dos == excel_dos:
+                                        census_rec = "BILLED"
+                                        matched = True
+                                        break 
+                                    else:
+                                        census_rec = "MISMATCHED DOS"
+                            if matched:
+                                break 
+
+                        if not matched:
+                            census_rec = "MISMATCHED DOS"
+                    else:
+                        census_rec = "NAME NOT IN TABLEAU" 
+
+                    if row['Status'] != "DE_COMPLETE":
+                        return ""  # skip rows that shouldn't be marked
+
+                    return census_rec
+
+                df_excel['Census Reconciliation'] = df_excel.apply(get_encounter, axis=1)
+
+            
         # Save processed file
         new_file_path = Path(file_path).with_name(f"PROCESSED______{Path(file_path).stem}.xlsx")
         with pd.ExcelWriter(new_file_path, engine='xlsxwriter', datetime_format='mm/dd/yyyy') as writer:

@@ -45,7 +45,7 @@ class TableauFetcher:
 
                 server.views.populate_csv(target_view, req_options=req_option)
                 self._update_progress(15)
-                self._safe_insert("Downloading data, this may take some time...\n")
+                self._safe_insert("Downloading data, this may take some time..\n")
 
                 csv_bytes = b"".join(target_view.csv)
                 df = pd.read_csv(BytesIO(csv_bytes), on_bad_lines='warn', engine="python")

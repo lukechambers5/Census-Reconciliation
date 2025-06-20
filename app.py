@@ -1,6 +1,7 @@
 import ttkbootstrap as tb
 from ttkbootstrap.constants import *
 import tkinter as tk
+from tkinter import ttk
 from tkinter import messagebox, filedialog, simpledialog
 import os
 import threading
@@ -19,40 +20,52 @@ class TableauApp(tb.Window):
 
         login = tk.Toplevel()
         login.title("Login to Tableau")
-        login.geometry("500x550")
+        login.geometry("1050x600")
         login.resizable(False, False)
         login.grab_set()
 
-        tk.Label(login, text="Username:").pack(pady=(15, 5))
-        username_entry = tk.Entry(login, width=30)
+        # Centering container frame
+        container = tk.Frame(login)
+        container.place(relx=0.5, rely=0.5, anchor='center')
+
+        label_font = ("Segoe UI", 14)
+        entry_font = ("Segoe UI", 14)
+        button_font = ("Segoe UI", 14, "bold")
+
+        tk.Label(container, text="Username:", font=label_font).pack(pady=(15, 5))
+        username_entry = tk.Entry(container, width=40, font=entry_font)
         username_entry.pack()
 
-        tk.Label(login, text="Password:").pack(pady=(10, 5))
-        password_entry = tk.Entry(login, show="*", width=30)
+        tk.Label(container, text="Password:", font=label_font).pack(pady=(15, 5))
+        password_entry = tk.Entry(container, show="*", width=40, font=entry_font)
         password_entry.pack()
 
         credentials = {}
 
-        error_label = tk.Label(login, text="", fg="red", font=("Segoe UI", 10, "bold"))
-        error_label.pack(pady=(5, 10)) 
+        style = ttk.Style()
+        style.configure("Error.TLabel", foreground="red", font=("Segoe UI", 8, "bold"))
+
+        # Create label using style
+        error_label = ttk.Label(container, text="", style="Error.TLabel")
+        error_label.pack(pady=(10, 10))
         
         def clear_error(event=None):
             error_label.config(text="")
 
         username_entry.bind("<Key>", clear_error)
         password_entry.bind("<Key>", clear_error)
-            
+        login.bind('<Return>', lambda event: submit())
 
         def submit():
             username = username_entry.get().strip()
             password = password_entry.get().strip()
 
             if not username or not password:
-                messagebox.showerror("Login Failed", "Username and password are required.")
+                error_label.config(text="Username and password are required.")
                 return
 
             try:
-                tableau_auth = TSC.TableauAuth(username, password, SITE_ID)  # Use your SITE_ID here
+                tableau_auth = TSC.TableauAuth(username, password, SITE_ID) 
                 server = TSC.Server(TABLEAU_SERVER, use_server_version=True)
 
                 with server.auth.sign_in(tableau_auth):
@@ -63,8 +76,8 @@ class TableauApp(tb.Window):
             except Exception as e:
                 error_label.config(text="Invalid login credentials. Please try again.")
 
+        tk.Button(container, text="Login", width=20, height=2, font=button_font, command=submit).pack(pady=(20, 5))
 
-        tk.Button(login, text="Login", width=10, command=submit).pack(pady=15)
 
         self.wait_window(login)
 
@@ -75,7 +88,7 @@ class TableauApp(tb.Window):
         self.deiconify() 
         
         self.title("Census Reconciliation Tool")
-        self.geometry("500x550")
+        self.geometry("1050x600")
         self.resizable(False, False)
 
         self.encounter_lookup = defaultdict(lambda: defaultdict(list))
@@ -105,12 +118,12 @@ class TableauApp(tb.Window):
             self,
             mode="determinate",
             bootstyle="success",
-            length=300
+            length=800
         )
         self.progress.pack(pady=10)
     
         # Output text area
-        self.output_text = tb.ScrolledText(self, height=13, width=55, font=("Consolas", 9))
+        self.output_text = tb.ScrolledText(self, height=13, width=80, font=("Consolas", 9))
         self.output_text.pack(pady=10)
 
         self.fetch_btn = tb.Button(self, text="Fetch Tableau View")
@@ -182,7 +195,7 @@ class TableauApp(tb.Window):
                 encounter_lookup=self.encounter_lookup,
                 df_tableau=self.df_tableau,
                 output_callback=self.append_output,
-                tableau_fetcher=tableau_fetcher
+                tableau_fetcher=tableau_fetcher,
             )
             if processed_path:
                 if messagebox.askyesno("Open File", f"Processed file saved:\n{processed_path}\n\nDo you want to open it?"):
