@@ -4,7 +4,12 @@ This internal-use Python application streamlines reconciliation of hospital Exce
 
 ---
 
-## Screenshots
+## Demo
+
+### Login
+![Login](assets/ss0.png)
+
+Lets user login to access Tableau data
 
 ### Launch Screen   
 ![Launch Screen](assets/ss1.png)

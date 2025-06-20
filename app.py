@@ -1,16 +1,79 @@
 import ttkbootstrap as tb
 from ttkbootstrap.constants import *
-from tkinter import messagebox, filedialog
+import tkinter as tk
+from tkinter import messagebox, filedialog, simpledialog
 import os
 import threading
 from collections import defaultdict
 from tableau_fetch import TableauFetcher
+import tableauserverclient as TSC
 import tableau_fetch
 from excel_processing import process_excel_file
+from config import TABLEAU_SERVER, SITE_ID
 
 class TableauApp(tb.Window):
     def __init__(self):
         super().__init__(themename="cyborg")
+
+        self.withdraw()
+
+        login = tk.Toplevel()
+        login.title("Login to Tableau")
+        login.geometry("500x550")
+        login.resizable(False, False)
+        login.grab_set()
+
+        tk.Label(login, text="Username:").pack(pady=(15, 5))
+        username_entry = tk.Entry(login, width=30)
+        username_entry.pack()
+
+        tk.Label(login, text="Password:").pack(pady=(10, 5))
+        password_entry = tk.Entry(login, show="*", width=30)
+        password_entry.pack()
+
+        credentials = {}
+
+        error_label = tk.Label(login, text="", fg="red", font=("Segoe UI", 10, "bold"))
+        error_label.pack(pady=(5, 10)) 
+        
+        def clear_error(event=None):
+            error_label.config(text="")
+
+        username_entry.bind("<Key>", clear_error)
+        password_entry.bind("<Key>", clear_error)
+            
+
+        def submit():
+            username = username_entry.get().strip()
+            password = password_entry.get().strip()
+
+            if not username or not password:
+                messagebox.showerror("Login Failed", "Username and password are required.")
+                return
+
+            try:
+                tableau_auth = TSC.TableauAuth(username, password, SITE_ID)  # Use your SITE_ID here
+                server = TSC.Server(TABLEAU_SERVER, use_server_version=True)
+
+                with server.auth.sign_in(tableau_auth):
+                    credentials["username"] = username
+                    credentials["password"] = password
+                    login.destroy()
+
+            except Exception as e:
+                error_label.config(text="Invalid login credentials. Please try again.")
+
+
+        tk.Button(login, text="Login", width=10, command=submit).pack(pady=15)
+
+        self.wait_window(login)
+
+        if not credentials:
+            self.destroy()
+            return
+        
+        self.deiconify() 
+        
         self.title("Census Reconciliation Tool")
         self.geometry("500x550")
         self.resizable(False, False)
@@ -20,6 +83,8 @@ class TableauApp(tb.Window):
 
         # Create TableauFetcher instance with UI callbacks
         self.fetcher = TableauFetcher(
+            username=credentials["username"],
+            password=credentials["password"],
             output_callback=self.append_output,
             progress_callback=self.update_progress
         )

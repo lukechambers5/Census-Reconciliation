@@ -2,10 +2,12 @@ from collections import defaultdict
 import tableauserverclient as TSC
 import pandas as pd
 from io import BytesIO
-from config import ACCESS_TOKEN, VIEW_ID, TABLEAU_SERVER, TOKEN_NAME, SITE_ID
+from config import VIEW_ID, TABLEAU_SERVER, SITE_ID
 
 class TableauFetcher:
-    def __init__(self, output_callback=None, progress_callback=None):
+    def __init__(self, username, password, output_callback=None, progress_callback=None):
+        self.username = username
+        self.password = password
         self.encounter_lookup = defaultdict(lambda: defaultdict(list))
         self.patient_info_lookup = {}
         self.df_tableau = None
@@ -22,7 +24,7 @@ class TableauFetcher:
 
     def fetch_data(self, license_key):
         try:
-            tableau_auth = TSC.PersonalAccessTokenAuth(TOKEN_NAME, ACCESS_TOKEN, SITE_ID)
+            tableau_auth = TSC.TableauAuth(self.username, self.password, SITE_ID)
             server = TSC.Server(TABLEAU_SERVER, use_server_version=True)
 
             with server.auth.sign_in(tableau_auth):
