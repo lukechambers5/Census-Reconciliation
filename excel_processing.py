@@ -4,8 +4,9 @@ import os
 import traceback
 
 def process_excel_file(file_path, license_key, encounter_lookup=None, df_tableau=None, output_callback=None, tableau_fetcher=None):
-
     try:
+        if output_callback:
+            output_callback("Processing Excel file... May take some time for larger files\n")
         df_excel = pd.read_excel(file_path)
         
         # Convert 'Date of Service' to datetime
@@ -50,7 +51,7 @@ def process_excel_file(file_path, license_key, encounter_lookup=None, df_tableau
 
                         df_excel.at[idx, "Patient DOB"] = formatted_dob
                         df_excel.at[idx, "Patient MRN"] = patient_info.get("mrn", "")
-        if(license_key == "160214"):
+        if(license_key == "160214" or license_key == "137797"):
             # Create ID1, ID2, ID3 columns
             if all(col in df_excel.columns for col in ['Date of Service', 'Patient DOB', 'Last Name', 'Patient MRN']):
                 df_excel["Date of Service"] = pd.to_datetime(df_excel["Date of Service"], errors="coerce").dt.normalize()
@@ -71,62 +72,65 @@ def process_excel_file(file_path, license_key, encounter_lookup=None, df_tableau
             # Ensure 'E&M (Pro)' column exists
             if 'E&M (Pro)' not in df_excel.columns:
                 df_excel['E&M (Pro)'] = ""
+            if(license_key == "160214"):
+                # Update 'E&M (Pro)' based on encounter_lookup
+                def get_encounter(row):
+                    last = str(row.get('Last Name', '')).strip().upper()
+                    first = str(row.get('First Name', '')).strip().upper()
+                    key = (last, first)
 
-            # Update 'E&M (Pro)' based on encounter_lookup
-            def get_encounter(row):
-                last = str(row.get('Last Name', '')).strip().upper()
-                first = str(row.get('First Name', '')).strip().upper()
-                key = (last, first)
-
-                encounters = encounter_lookup.get(key, {}) if encounter_lookup else {}
-                use_code = ""
-                census_rec = ""
-                status = "OPEN"
-
-                if encounters:
-                    for appt_id, code_dos_set in encounters.items():
-                        if use_code:
-                            break
-                        for code, dos in code_dos_set:
-                            tableau_dos = dos
-                            dos_excel = row['Date of Service']
-                            if pd.notnull(dos_excel):
-                                excel_dos = f"{dos_excel.month}/{dos_excel.day}/{dos_excel.year}"
-                                if tableau_dos == excel_dos:
-                                    if code.startswith("99") or code in ["LWBS", "AMA", "0", "NULL"]:
-                                        status = "OPEN"
-                                        use_code = code
-                                        break
-                                    else:
-                                        status = 'INVALID CHARGE CODE'
-                                else:
-                                    status = "MISMATCH DOS"
-                else:
-                    status = "NAME NOT FOUND"
-
-                if use_code == "LWBS":
-                    census_rec = "LWBS"
-                elif use_code == "AMA":
-                    census_rec = "AMA"
-                elif use_code == "0":
-                    census_rec = "NON ED ENCOUNTERS"
-                elif use_code == "NULL":
+                    encounters = encounter_lookup.get(key, {}) if encounter_lookup else {}
+                    use_code = ""
                     census_rec = ""
-                elif use_code.startswith("99"):
-                    census_rec = "BILLED"
-                else:
-                    census_rec = "#N/A"
+                    status = "OPEN"
 
-                return pd.Series([use_code, census_rec, status])
+                    if encounters:
+                        for appt_id, code_dos_set in encounters.items():
+                            if use_code:
+                                break
+                            for code, dos in code_dos_set:
+                                tableau_dos = dos
+                                dos_excel = row['Date of Service']
+                                if pd.notnull(dos_excel):
+                                    excel_dos = f"{dos_excel.month}/{dos_excel.day}/{dos_excel.year}"
+                                    if tableau_dos == excel_dos:
+                                        if code.startswith("99") or code in ["LWBS", "AMA", "0", "NULL"]:
+                                            status = "OPEN"
+                                            use_code = code
+                                            break
+                                        else:
+                                            status = 'INVALID CHARGE CODE'
+                                    else:
+                                        status = "MISMATCH DOS"
+                    else:
+                        status = "NAME NOT FOUND"
 
-            df_excel[['E&M (Pro)', 'Census Reconciliation', 'Status']] = df_excel.apply(get_encounter, axis=1)
+                    if use_code == "LWBS":
+                        census_rec = "LWBS"
+                    elif use_code == "AMA":
+                        census_rec = "AMA"
+                    elif use_code == "0":
+                        census_rec = "NON ED ENCOUNTERS"
+                    elif use_code == "NULL":
+                        census_rec = ""
+                    elif use_code.startswith("99"):
+                        census_rec = "BILLED"
+                    else:
+                        census_rec = "#N/A"
 
-            condition = (
-                df_excel['Status'].str.upper() == 'OPEN'
-            ) & (
-                df_excel['Census Reconciliation'].isin(['BILLED', 'LWBS', 'AMA'])
-            )
-            df_excel.loc[condition, 'Status'] = 'DE_COMPLETE'
+                    return pd.Series([use_code, census_rec, status])
+
+                df_excel[['E&M (Pro)', 'Census Reconciliation', 'Status']] = df_excel.apply(get_encounter, axis=1)
+
+                condition = (
+                    df_excel['Status'].str.upper() == 'OPEN'
+                ) & (
+                    df_excel['Census Reconciliation'].isin(['BILLED', 'LWBS', 'AMA'])
+                )
+                df_excel.loc[condition, 'Status'] = 'DE_COMPLETE'
+
+            if(license_key == "137797"):
+                df_excel.loc[df_excel['Status'] == "DE_COMPLETE", 'Census Reconciliation'] = "BILLED"
 
         # Save processed file
         new_file_path = Path(file_path).with_name(f"PROCESSED______{Path(file_path).stem}.xlsx")

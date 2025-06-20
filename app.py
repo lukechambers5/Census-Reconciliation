@@ -110,7 +110,6 @@ class TableauApp(tb.Window):
         if not file_path:
             return
         tableau_fetcher = self.fetcher
-
         def run_process():
             processed_path = process_excel_file(
                 file_path,
