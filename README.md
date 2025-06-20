@@ -1,11 +1,31 @@
 # Tableau Census Reconciliation Tool
 
 This internal-use Python application streamlines reconciliation of hospital Excel records with Tableau census data. It connects securely to Tableau, fetches patient encounter details, and applies automated matching and validation rules to uploaded Excel files — generating a reconciled output with status flags, calculated IDs, and charge code evaluations.
+
 ---
 
-![App Screenshot](assets/ss1.png)
+## Screenshots
 
-*Note: The screenshot does not display actual patient information to ensure privacy and comply with data protection regulations.*
+### Launch Screen  
+The app's initial interface for starting the reconciliation workflow.  
+![Launch Screen](assets/ss1.png)
+
+### Tableau Connection  
+Enter your license key to securely connect to Tableau.  
+![Connecting to Tableau](assets/ss2.png)
+
+### Data Retrieval  
+Once connected, patient encounter data is fetched from the Tableau view.  
+![Retrieving Data](assets/ss3.png)
+
+### Data Ready  
+Data successfully retrieved and available for reconciliation.  
+![Data Retrieved](assets/ss4.png)
+
+### File Upload & Results  
+Upload your hospital Excel file, then access the processed, reconciled output.  
+![Processed Output](assets/ss5.png)
+
 ---
 
 ## 📌 What It Does
