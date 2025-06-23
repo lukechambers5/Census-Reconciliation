@@ -136,9 +136,6 @@ def process_excel_file(file_path, license_key, encounter_lookup=None, df_tableau
                     for stat, ex, matched in zip(statuses, mask_exists, mask_dos_matched)
                 ]
 
-
-
-
         # 7) Inject MRN & DOB via dict‐mapping (keeps every DOS row intact)
         if tableau_fetcher and getattr(tableau_fetcher, 'patient_info_lookup', None) and license_key == '137797':
             # build lookup dicts safely

@@ -2,7 +2,6 @@ from collections import defaultdict
 import tableauserverclient as TSC
 import pandas as pd
 from io import BytesIO
-from config import VIEW_ID, TABLEAU_SERVER, SITE_ID
 
 class TableauFetcher:
     def __init__(self, username, password, output_callback=None, progress_callback=None):
@@ -24,12 +23,12 @@ class TableauFetcher:
 
     def fetch_data(self, license_key):
         try:
-            tableau_auth = TSC.TableauAuth(self.username, self.password, SITE_ID)
-            server = TSC.Server(TABLEAU_SERVER, use_server_version=True)
+            tableau_auth = TSC.TableauAuth(self.username, self.password, '')
+            server = TSC.Server("https://tableau.blitzmedical.com", use_server_version=True)
 
             with server.auth.sign_in(tableau_auth):
                 self._update_progress(5)
-                target_view = server.views.get_by_id(VIEW_ID)
+                target_view = server.views.get_by_id("28773dd1-0c1e-445b-96f9-264fcdd0f485")
                 if not target_view:
                     self._safe_insert("Target view not found.\n")
                     return None

@@ -10,7 +10,6 @@ from tableau_fetch import TableauFetcher
 import tableauserverclient as TSC
 import tableau_fetch
 from excel_processing import process_excel_file
-from config import TABLEAU_SERVER, SITE_ID
 
 class TableauApp(tb.Window):
     def __init__(self):
@@ -65,8 +64,8 @@ class TableauApp(tb.Window):
                 return
 
             try:
-                tableau_auth = TSC.TableauAuth(username, password, SITE_ID) 
-                server = TSC.Server(TABLEAU_SERVER, use_server_version=True)
+                tableau_auth = TSC.TableauAuth(username, password, '') 
+                server = TSC.Server("https://tableau.blitzmedical.com", use_server_version=True)
 
                 with server.auth.sign_in(tableau_auth):
                     credentials["username"] = username
