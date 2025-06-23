@@ -63,13 +63,18 @@ class TableauFetcher:
                     dob = str(row['DOB']).strip()
                     mrn = str(row['Chart Number']).strip();
                     name_key = (last, first)
+                    provider = str(row.get('Provider', '')).strip()
+
                     if name_key not in self.patient_info_lookup:
                         self.patient_info_lookup[name_key] = {
                             "dob": dob,
                             "mrn": mrn
                         }
-                    if (code, dos) not in self.encounter_lookup[(last, first)][appointment_num]:
-                        self.encounter_lookup[(last, first)][appointment_num].append((code, dos))
+                    provider = str(row.get('Provider', '')).strip()
+                    provider_key = (last, first, dos)
+
+                    if (code, dos) not in [(c, d) for c, d, _ in self.encounter_lookup[(last, first)][appointment_num]]:
+                        self.encounter_lookup[(last, first)][appointment_num].append((code, dos, provider))
 
                     if i % max(1, total_rows // 20) == 0:
                         progress_val = 40 + int((i / total_rows) * 60)

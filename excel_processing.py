@@ -1,194 +1,204 @@
 import pandas as pd
+import numpy as np
 from pathlib import Path
-import os
 import traceback
 
-def process_excel_file(file_path, license_key, encounter_lookup=None, df_tableau=None, output_callback=None, tableau_fetcher=None):
+def process_excel_file(file_path, license_key, encounter_lookup=None, df_tableau=None, tableau_fetcher=None, output_callback=None):
     try:
         if output_callback:
             output_callback("Processing Excel file... May take some time for larger files\n")
-        df_excel = pd.read_excel(file_path)
-        
-        # Convert 'Date of Service' to datetime
-        if 'Date of Service' in df_excel.columns:
-            df_excel['Date of Service'] = pd.to_datetime(df_excel['Date of Service'], errors='coerce')
 
-        # Split 'Patient Name' into Last Name and First Name
-        if 'Patient Name' in df_excel.columns:
-            names_split = df_excel['Patient Name'].astype(str).str.split(',', n=1, expand=True)
-            last_name_col = names_split[0].str.strip()
-            first_name_col = names_split[1].str.strip() if names_split.shape[1] > 1 else ''
-            patient_name_index = df_excel.columns.get_loc('Patient Name')
-            df_excel.insert(patient_name_index + 1, 'Last Name', last_name_col)
-            df_excel.insert(patient_name_index + 2, 'First Name', first_name_col)
+        # 1) Read and parse dates
+        df = pd.read_excel(
+            file_path,
+            parse_dates=['Date of Service'],
+            usecols=None
+        )
 
-        if(license_key == "137797"):
-            if 'Last Name' in df_excel.columns and 'First Name' in df_excel.columns:
-                if 'Patient Account #' in df_excel.columns:
-                    acct_index = df_excel.columns.get_loc('Patient Account #')
-                    df_excel.insert(acct_index + 1, 'Patient MRN', "")
-                    df_excel.insert(acct_index + 2, 'Patient DOB', "")
-                else:
-                    # Fallback
-                    df_excel['Patient MRN'] = ""
-                    df_excel['Patient DOB'] = ""
-                for idx, row in df_excel.iterrows():
-                    last = str(row["Last Name"]).strip().upper()
-                    first = str(row["First Name"]).strip().upper()
+        # 2) Split 'Patient Name' into Last/First, uppercase, then compute FirstKey
+        if 'Patient Name' in df.columns:
+            names = df['Patient Name'].astype(str).str.split(',', n=1, expand=True)
+            df['Last Name']  = names[0].str.strip().str.upper()
+            df['First Name'] = names[1].str.strip().str.upper().fillna("")
+            # key is first token before any space
+            df['FirstKey']  = df['First Name'].str.split().str[0]
 
-                    patient_info = None
-                    if tableau_fetcher.patient_info_lookup:
-                        for (enc_last, enc_first), info in tableau_fetcher.patient_info_lookup.items():
-                            if enc_last == last and (first.startswith(enc_first) or enc_first in first):
-                                patient_info = info
-                                break 
+        # Initialize columns
+        cols_to_init = [
+            'Provider','Patient MRN','Patient DOB',
+            'ID1','ID2','ID3','Census Reconciliation','UNBILLED','E&M (Pro)','Status'
+        ]
+        for col in cols_to_init:
+            if col not in df.columns:
+                df[col] = ""
 
-                    if patient_info:
-                        raw_dob = patient_info.get("dob", "")
-                        try:
-                            parsed_dob = pd.to_datetime(raw_dob, errors="coerce")
-                            if pd.notnull(parsed_dob):
-                                formatted_dob = parsed_dob.strftime("%m/%d/%Y")
-                            else:
-                                formatted_dob = ""
-                        except Exception:
-                            formatted_dob = ""
+        # 3) Normalize DOS for merging
+        df['DosNormalize'] = df['Date of Service'].dt.normalize()
 
-                        df_excel.at[idx, "Patient DOB"] = formatted_dob
-                        df_excel.at[idx, "Patient MRN"] = patient_info.get("mrn", "")
-        if(license_key == "160214" or license_key == "137797"):
-            # Create ID1, ID2, ID3 columns
-            if all(col in df_excel.columns for col in ['Date of Service', 'Patient DOB', 'Last Name', 'Patient MRN']):
-                df_excel["Date of Service"] = pd.to_datetime(df_excel["Date of Service"], errors="coerce").dt.normalize()
-                excel_serial_DOS = (df_excel["Date of Service"] - pd.Timestamp("1899-12-30")).dt.days
-                df_excel["Patient DOB"] = pd.to_datetime(df_excel["Patient DOB"], errors="coerce").dt.normalize()
-                excel_serial_DOB = (df_excel["Patient DOB"] - pd.Timestamp("1899-12-30")).dt.days
-                df_excel.insert(0, 'ID1', df_excel["Patient MRN"].astype(str) + excel_serial_DOS.astype(str))
-                df_excel.insert(df_excel.columns.get_loc('ID1') + 1, 'ID2', excel_serial_DOS.astype(str) + excel_serial_DOB.astype(str) + df_excel["Last Name"])
-                df_excel.insert(df_excel.columns.get_loc('ID2') + 1, 'ID3', '')  # Placeholder for ID3
-            else:
-                if output_callback:
-                    output_callback("Missing columns required for ID generation.\n")
+        # 4) Flatten & merge encounter_lookup using FirstKey
+        if encounter_lookup and license_key in ('160214', '137797'):
+            enc_rows = []
+            for (last, first), appts in encounter_lookup.items():
+                # first here should already be uppercase and the short form
+                key_first = first.upper()
+                for appt_id, entries in appts.items():
+                    for code, dos_str, provider in entries:
+                        enc_rows.append({
+                            'Last Name': last,
+                            'FirstKey': key_first,
+                            'DosLookup': pd.to_datetime(
+                                dos_str, format='%m/%d/%Y', errors='coerce'
+                            ).normalize(),
+                            'Code': code,
+                            'ProviderLookup': provider
+                        })
+            enc_df = pd.DataFrame(enc_rows)
 
-            # Add empty columns for reconciliation status
-            df_excel["Census Reconciliation"] = ""
-            df_excel["UNBILLED"] = ""
 
-            # Ensure 'E&M (Pro)' column exists
-            if 'E&M (Pro)' not in df_excel.columns:
-                df_excel['E&M (Pro)'] = ""
-            if(license_key == "160214"):
-                # Update 'E&M (Pro)' based on encounter_lookup
-                def get_encounter(row):
-                    last = str(row.get('Last Name', '')).strip().upper()
-                    first = str(row.get('First Name', '')).strip().upper()
-                    key = (last, first)
+            enc_df['is_99'] = enc_df['Code'].str.startswith('99', na=False)
 
-                    encounters = encounter_lookup.get(key, {}) if encounter_lookup else {}
-                    use_code = ""
-                    census_rec = ""
-                    status = "OPEN"
+            enc_df = enc_df.sort_values(
+                ['Last Name','FirstKey','DosLookup','is_99'],
+                ascending=[True, True, True, False]
+            )
 
-                    if encounters:
-                        for appt_id, code_dos_set in encounters.items():
-                            if use_code:
-                                break
-                            for code, dos in code_dos_set:
-                                tableau_dos = dos
-                                dos_excel = row['Date of Service']
-                                if pd.notnull(dos_excel):
-                                    excel_dos = f"{dos_excel.month}/{dos_excel.day}/{dos_excel.year}"
-                                    if tableau_dos == excel_dos:
-                                        if code.startswith("99") or code in ["LWBS", "AMA", "0", "NULL"]:
-                                            status = "OPEN"
-                                            use_code = code
-                                            break
-                                        else:
-                                            status = 'INVALID CHARGE CODE'
-                                    else:
-                                        status = "MISMATCH DOS"
-                    else:
-                        status = "NAME NOT FOUND"
+            enc_df = enc_df.drop_duplicates(
+                subset=['Last Name','FirstKey','DosLookup'],
+                keep='first'
+            ).drop(columns='is_99')
+            # ──────────────────────────────────
 
-                    if use_code == "LWBS":
-                        census_rec = "LWBS"
-                    elif use_code == "AMA":
-                        census_rec = "AMA"
-                    elif use_code == "0":
-                        census_rec = "NON ED ENCOUNTERS"
-                    elif use_code == "NULL":
-                        census_rec = ""
-                    elif use_code.startswith("99"):
-                        census_rec = "BILLED"
-                    else:
-                        census_rec = "#N/A"
+            df = df.merge(
+                enc_df,
+                left_on=['Last Name','FirstKey','DosNormalize'],
+                right_on=['Last Name','FirstKey','DosLookup'],
+                how='left'
+            )
 
-                    return pd.Series([use_code, census_rec, status])
+            # 5) Fill Provider
+            df['Provider'] = df['ProviderLookup'].fillna("")
 
-                df_excel[['E&M (Pro)', 'Census Reconciliation', 'Status']] = df_excel.apply(get_encounter, axis=1)
+            # 6) License-specific reconciliation
+            if license_key == '160214':
+                cond_billed = df['Code'].str.startswith('99', na=False)
+                cond_lwbs   = df['Code']=='LWBS'
+                cond_ama    = df['Code']=='AMA'
+                cond_zero   = df['Code']=='0'
+                cond_null   = df['Code']=='NULL'
 
-                condition = (
-                    df_excel['Status'].str.upper() == 'OPEN'
-                ) & (
-                    df_excel['Census Reconciliation'].isin(['BILLED', 'LWBS', 'AMA'])
+                df['use_code'] = np.select(
+                    [cond_lwbs, cond_ama, cond_zero, cond_null, cond_billed],
+                    ['LWBS','AMA','0','NULL', df['Code']],
+                    default=''
                 )
-                df_excel.loc[condition, 'Status'] = 'DE_COMPLETE'
+                df['Census Reconciliation'] = np.select(
+                    [cond_lwbs, cond_ama, cond_zero, cond_null, cond_billed],
+                    ['LWBS','AMA','NON ED ENCOUNTERS','', 'BILLED'],
+                    default='#N/A'
+                )
+                
+                df['Status'] = np.where(df['use_code']=='', 'MISMATCH DOS', 'OPEN')
+                   # complete where billed
+                df.loc[
+                    cond_billed & df['Census Reconciliation'].isin(['BILLED','LWBS','AMA']),
+                    'Status'
+                ] = 'DE_COMPLETE'
 
-            if(license_key == "137797"):
-                def get_encounter(row):
-                    last = str(row.get('Last Name', '')).strip().upper()
-                    first = str(row.get('First Name', '')).strip().upper()
-                    key = (last, first)
+                # now mark invalid codes (not one of your known buckets)
+                cond_invalid = df['Code'].notna() & ~(
+                    cond_lwbs | cond_ama | cond_zero | cond_null | cond_billed
+                )
+                df.loc[cond_invalid, 'Status'] = 'INVALID CODE IN TABLEAU'
 
-                    encounters = {}
-                    if encounter_lookup:
-                        for (enc_last, enc_first), value in encounter_lookup.items():
-                            if enc_last == last and (first.startswith(enc_first) or enc_first in first):
-                                encounters = value
-                                break
-                    census_rec = ""
+                df['E&M (Pro)'] = df['use_code']
 
-                    if encounters:
-                        matched = False
-                        for appt_id, code_dos_set in encounters.items():
-                            for code, dos in code_dos_set:
-                                tableau_dos = dos
-                                dos_excel = row['Date of Service']
-                                if pd.notnull(dos_excel):
-                                    excel_dos = f"{dos_excel.month}/{dos_excel.day}/{dos_excel.year}"
-                                    if tableau_dos == excel_dos:
-                                        census_rec = "BILLED"
-                                        matched = True
-                                        break 
-                                    else:
-                                        census_rec = "MISMATCHED DOS"
-                            if matched:
-                                break 
+                tableau_keys = set(encounter_lookup.keys())
+                key_series = pd.Series(list(zip(df['Last Name'], df['FirstKey'])))
+                mask_name_exists = key_series.isin(tableau_keys)
+                df.loc[~mask_name_exists, 'Status'] = 'NAME NOT FOUND IN TABLEAU'
+                
 
-                        if not matched:
-                            census_rec = "MISMATCHED DOS"
-                    else:
-                        census_rec = "NAME NOT IN TABLEAU" 
+            elif license_key == '137797':
+                # build lookup of all patients we saw in Tableau
+                tableau_keys = set(encounter_lookup.keys())
+                patient_keys    = list(zip(df['Last Name'], df['FirstKey']))
+                mask_exists     = [k in tableau_keys for k in patient_keys]
+                mask_dos_matched = df['Code'].notna()
+                statuses        = df['Status'].fillna('').astype(str)
 
-                    if row['Status'] != "DE_COMPLETE":
-                        return ""  # skip rows that shouldn't be marked
+                # now for each row: if ABANDONED → blank; else if exists & dos matched → BILLED;
+                # else if exists & dos mismatched → MISMATCHED DOS; else → NAME NOT IN TABLEAU
+                df['Census Reconciliation'] = [
+                    "" if stat == 'ABANDONED' else
+                    'BILLED'         if ex and matched else
+                    'MISMATCHED DOS' if ex and not matched else
+                    'NAME NOT IN TABLEAU'
+                    for stat, ex, matched in zip(statuses, mask_exists, mask_dos_matched)
+                ]
 
-                    return census_rec
 
-                df_excel['Census Reconciliation'] = df_excel.apply(get_encounter, axis=1)
 
-            
-        # Save processed file
-        new_file_path = Path(file_path).with_name(f"PROCESSED______{Path(file_path).stem}.xlsx")
-        with pd.ExcelWriter(new_file_path, engine='xlsxwriter', datetime_format='mm/dd/yyyy') as writer:
-            df_excel.to_excel(writer, index=False)
 
+        # 7) Inject MRN & DOB via dict‐mapping (keeps every DOS row intact)
+        if tableau_fetcher and getattr(tableau_fetcher, 'patient_info_lookup', None) and license_key == '137797':
+            # build lookup dicts safely
+            mrn_map = {}
+            dob_map = {}
+            for (l, f), info in tableau_fetcher.patient_info_lookup.items():
+                key = (l.upper(), f.upper())
+                mrn_map[key] = info.get('mrn', '')  # always a string
+
+                # parse DOB and only format if not NaT
+                raw_dob = info.get('dob', '')
+                dob_ts  = pd.to_datetime(raw_dob, errors='coerce')
+                if pd.notnull(dob_ts):
+                    dob_map[key] = dob_ts.strftime('%m/%d/%Y')
+                else:
+                    dob_map[key] = ""
+
+            # now map back onto every Excel row
+            keys = list(zip(df['Last Name'], df['FirstKey']))
+            df['Patient MRN'] = [mrn_map.get(k, "") for k in keys]
+            df['Patient DOB'] = [dob_map.get(k, "") for k in keys]
+
+
+        # 8) Generate IDs
+        if license_key in ('160214','137797'):
+            df['DosNorm'] = df['Date of Service'].dt.normalize()
+            df['DobNorm'] = pd.to_datetime(
+                df['Patient DOB'], format='%m/%d/%Y', errors='coerce'
+            ).dt.normalize()
+            serial_DOS = (df['DosNorm'] - pd.Timestamp('1899-12-30')).dt.days.astype(str)
+            serial_DOB = (df['DobNorm'] - pd.Timestamp('1899-12-30')).dt.days.astype(str)
+
+            df['ID1'] = df['Patient MRN'].astype(str) + serial_DOS
+            df['ID2'] = serial_DOS + serial_DOB + df['Last Name']
+            df['ID3'] = ''
+
+        # 9) Drop helper cols
+        df.drop(columns=[
+            'DosNormalize','DosLookup','ProviderLookup','Code',
+            'use_code','DosNorm','DobNorm','MRN','DobLookup','FirstKey'
+        ], errors='ignore', inplace=True)
+
+        # 10) Reorder columns
+        desired = [
+            'ID1','ID2','ID3',
+            'Date of Service','Date Billed','Facility','Patient Account #',
+            'Patient MRN','Patient DOB','Patient Name','Last Name','First Name',
+            'E&M (Fac)','E&M (Pro)','Status','Census Reconciliation','UNBILLED','Provider'
+        ]
+        cols = [c for c in desired if c in df.columns] + [c for c in df.columns if c not in desired]
+        df = df[cols]
+
+        # 11) Save
+        out = Path(file_path).with_name(f"PROCESSED______{Path(file_path).stem}.xlsx")
+        df.to_excel(out, index=False)
         if output_callback:
-            output_callback(f"Processed file saved: {new_file_path}\n")
+            output_callback(f"Processed file saved: {out}\n")
+        return out
 
-        return new_file_path
-
-    except Exception as e:
+    except Exception:
         if output_callback:
-            output_callback(f"Error processing Excel file: {e}\n{traceback.format_exc()}")
+            output_callback(traceback.format_exc())
         return None
