@@ -7,6 +7,7 @@ import os
 from collections import defaultdict
 from tableau_fetch import TableauFetcher
 from excel_processing import process_excel_file
+from process_names import get_names
 
 # Configure CustomTkinter appearance
 ctk.set_appearance_mode("dark")
@@ -19,46 +20,28 @@ class TableauApp(tb.Window):
         self.withdraw()
 
         credentials = {}
-        # Create a CustomTkinter login dialog
+        # -- Login Dialog --
         login = ctk.CTkToplevel(self)
         login.title("Login to Tableau")
         login.geometry("800x350")
         login.resizable(False, False)
         login.grab_set()
 
-        # Container frame for inputs
         container = ctk.CTkFrame(login)
         container.pack(expand=True, fill="both", padx=20, pady=20)
 
         label_font  = ("Segoe UI", 14)
         button_font = ("Segoe UI", 14, "bold")
 
-        # Username
         ctk.CTkLabel(container, text="Username:", font=label_font).pack(pady=(0,5))
-        username_entry = ctk.CTkEntry(
-            container,
-            width=300, height=35,
-            corner_radius=8
-        )
+        username_entry = ctk.CTkEntry(container, width=300, height=35, corner_radius=8)
         username_entry.pack(pady=(0,10))
 
-        # Password
         ctk.CTkLabel(container, text="Password:", font=label_font).pack(pady=(0,5))
-        password_entry = ctk.CTkEntry(
-            container,
-            width=300, height=35,
-            corner_radius=8,
-            show="*"
-        )
+        password_entry = ctk.CTkEntry(container, width=300, height=35, show="*", corner_radius=8)
         password_entry.pack(pady=(0,10))
 
-        # Error label
-        error_label = ctk.CTkLabel(
-            container,
-            text="",
-            text_color="#FF5555",
-            font=("Segoe UI", 10, "bold")
-        )
+        error_label = ctk.CTkLabel(container, text="", text_color="#FF5555", font=("Segoe UI", 10, "bold"))
         error_label.pack(pady=(0,10))
 
         def clear_error(event=None):
@@ -74,12 +57,8 @@ class TableauApp(tb.Window):
                 error_label.configure(text="Username and password are required.")
                 return
             try:
-                # Attempt Tableau sign-in
                 auth   = TSC.TableauAuth(user, pw, '')
-                server = TSC.Server(
-                    "https://tableau.blitzmedical.com",
-                    use_server_version=True
-                )
+                server = TSC.Server("https://tableau.blitzmedical.com", use_server_version=True)
                 with server.auth.sign_in(auth):
                     credentials['username'] = user
                     credentials['password'] = pw
@@ -87,30 +66,20 @@ class TableauApp(tb.Window):
             except Exception:
                 error_label.configure(text="Invalid login credentials. Please try again.")
 
-        # Login button
-        ctk.CTkButton(
-            container,
-            text="Login",
-            width=200, height=40,
-            corner_radius=20,
-            font=button_font,
-            command=submit
-        ).pack(pady=(10,0))
+        ctk.CTkButton(container, text="Login", width=200, height=40, corner_radius=20,
+                       font=button_font, command=submit).pack(pady=(10,0))
 
-        # Wait until login dialog closes
         self.wait_window(login)
-        # If no credentials, exit
         if not credentials:
             self.destroy()
             return
 
-        # Show main window
+        # -- Main Window --
         self.deiconify()
         self.title("Census Reconciliation Tool")
         self.geometry("1050x600")
         self.resizable(False, False)
 
-        # Initialize data structures
         self.encounter_lookup = defaultdict(lambda: defaultdict(list))
         self.df_tableau = None
         self.fetcher = TableauFetcher(
@@ -120,49 +89,22 @@ class TableauApp(tb.Window):
             progress_callback=self.update_progress
         )
 
-        # Site dropdown
         self.site_choice = tb.StringVar(value="Select Client")
-        tb.Combobox(
-            self,
-            textvariable=self.site_choice,
-            values=["Larkin","Elite","Concord"],
-            state="readonly",
-            width=20
-        ).pack(pady=10)
+        tb.Combobox(self, textvariable=self.site_choice,
+                    values=["Larkin","Elite","Concord"], state="readonly", width=20).pack(pady=10)
 
-        # Progress bar
-        self.progress = tb.Progressbar(
-            self,
-            mode="determinate",
-            bootstyle="success",
-            length=800
-        )
+        self.progress = tb.Progressbar(self, mode="determinate", bootstyle="success", length=800)
         self.progress.pack(pady=10)
 
-        # Output text area
-        self.output_text = tb.ScrolledText(
-            self,
-            height=13, width=80,
-            font=("Consolas", 9)
-        )
+        self.output_text = tb.ScrolledText(self, height=13, width=80, font=("Consolas", 9))
         self.output_text.pack(pady=10)
 
-        # Fetch & Upload buttons
         btn_frame = tb.Frame(self)
         btn_frame.pack(pady=(0,10))
-        self.fetch_btn = tb.Button(
-            btn_frame,
-            text="Fetch Tableau View",
-            bootstyle="primary",
-            command=self.fetch_tableau_data
-        )
-        self.fetch_btn.pack(side="left", padx=5)
-        self.upload_btn = tb.Button(
-            btn_frame,
-            text="Upload Excel File",
-            bootstyle="primary",
-            command=self.upload_file_with_license
-        )
+
+        # Single button to select file and kick off all processing
+        self.upload_btn = tb.Button(btn_frame, text="Upload & Process File",
+                                    bootstyle="primary", command=self.upload_file)
         self.upload_btn.pack(side="left", padx=5)
 
     def append_output(self, text):
@@ -171,13 +113,12 @@ class TableauApp(tb.Window):
     def update_progress(self, val):
         self.progress.after(0, lambda: self.progress.config(value=val))
 
-    def fetch_tableau_data(self):
-        # Clear output and reset progress
+    def fetch_tableau_data(self, names):
         self.output_text.delete("1.0", "end")
         self.append_output("Connecting to Tableau...\n")
         self.progress.configure(mode="determinate", maximum=100)
         self.progress['value'] = 0
-        self.fetch_btn.configure(state="disabled")
+        self.upload_btn.configure(state="disabled")
 
         site = self.site_choice.get()
         if site == "Larkin":
@@ -187,16 +128,14 @@ class TableauApp(tb.Window):
         elif site == "Concord":
             license_key = ""
         else:
-            messagebox.showwarning(
-                "Site Required",
-                "Please select a site before fetching."
-            )
-            self.fetch_btn.configure(state="normal")
+            messagebox.showwarning("Site Required", "Please select a site before fetching.")
+            self.upload_btn.configure(state="normal")
             return
 
         def worker():
             try:
-                df = self.fetcher.fetch_data(license_key)
+                # Pass patient-name list to fetcher
+                df = self.fetcher.fetch_data(license_key, filter_values=names)
                 if df is not None:
                     self.df_tableau = df
                     self.encounter_lookup = self.fetcher.encounter_lookup
@@ -204,27 +143,32 @@ class TableauApp(tb.Window):
                 else:
                     self.append_output("\nFetch failed.\n")
             finally:
-                self.fetch_btn.configure(state="normal")
+                self.upload_btn.configure(state="normal")
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def upload_file_with_license(self):
-        site = self.site_choice.get()
-        if site == "Larkin":
-            license_key = "137797"
-        elif site == "Elite":
-            license_key = "160214"
-        elif site == "Concord":
-            license_key = "159127"
-        else:
-            messagebox.showwarning(
-                "Site Required",
-                "Please select a site before uploading."
-            )
+    def upload_file(self):
+        file_path = filedialog.askopenfilename(
+            title="Select Patient List",
+            filetypes=[
+                ("Excel files", ("*.xlsx", "*.xls")),
+                ("CSV files",   ("*.csv",)),
+                ("All files",   ("*.*",)),
+            ]
+        )
+        if not file_path:
             return
-        self.upload_file(license_key)
 
-    def upload_file(self, license_key):
+        def worker():
+            names = get_names(file_path)
+            # Once names are ready, trigger fetch
+            self.after(0, lambda: self.fetch_tableau_data(names))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+
+
+    def process_file(self, license_key):
         if self.encounter_lookup is None:
             messagebox.showwarning(
                 "Data Missing",
