@@ -2,6 +2,7 @@ from collections import defaultdict
 import tableauserverclient as TSC
 import pandas as pd
 from io import BytesIO
+from tableauserverclient import RequestOptions
 
 class TableauFetcher:
     def __init__(self, username, password, output_callback=None, progress_callback=None):
@@ -25,10 +26,14 @@ class TableauFetcher:
         try:
             tableau_auth = TSC.TableauAuth(self.username, self.password, '')
             server = TSC.Server("https://tableau.blitzmedical.com", use_server_version=True)
+            if(license_key == '160214' or license_key == '137797'):
+                view_id = "28773dd1-0c1e-445b-96f9-264fcdd0f485"
+            else:
+                view_id = "19921e6e-ff1c-44fa-810d-b129b2806078"
 
             with server.auth.sign_in(tableau_auth):
                 self._update_progress(5)
-                target_view = server.views.get_by_id("28773dd1-0c1e-445b-96f9-264fcdd0f485")
+                target_view = server.views.get_by_id(view_id)
                 if not target_view:
                     self._safe_insert("Target view not found.\n")
                     return None
@@ -38,9 +43,13 @@ class TableauFetcher:
                 req_option = TSC.CSVRequestOptions()
                 req_option.max_rows = -1
                 req_option.include_all_columns = True
-                req_option.vf("Charge Code", "")
-                req_option.vf("Last Name", "")
-                req_option.vf("License Key", license_key)
+
+                if(license_key == '160214' or license_key == '137797'):
+                    req_option.vf("Charge Code", "")
+                    req_option.vf("Last Name", "")
+                    req_option.vf("License Key", license_key)
+                else:
+                    req_option.vf("License Key (group)", license_key)
 
                 server.views.populate_csv(target_view, req_options=req_option)
                 self._update_progress(15)
@@ -53,31 +62,32 @@ class TableauFetcher:
                 self._safe_insert("Processing data...\n")
 
                 total_rows = len(df)
-                for i, (_, row) in enumerate(df.iterrows()):
-                    last = str(row['Last Name']).strip().upper()
-                    first = str(row['FirstName']).strip().upper()
-                    code = str(row['Charge Code']).strip().upper()
-                    dos = str(row['DOS']).strip()
-                    appointment_num = str(row['Appointment FID']).strip()
-                    dob = str(row['DOB']).strip()
-                    mrn = str(row['Chart Number']).strip();
-                    name_key = (last, first)
-                    provider = str(row.get('Provider', '')).strip()
+                if(license_key == '160214' or license_key == '137797'):
+                    for i, (_, row) in enumerate(df.iterrows()):
+                        last = str(row['Last Name']).strip().upper()
+                        first = str(row['FirstName']).strip().upper()
+                        code = str(row['Charge Code']).strip().upper()
+                        dos = str(row['DOS']).strip()
+                        appointment_num = str(row['Appointment FID']).strip()
+                        dob = str(row['DOB']).strip()
+                        mrn = str(row['Chart Number']).strip();
+                        name_key = (last, first)
+                        provider = str(row.get('Provider', '')).strip()
 
-                    if name_key not in self.patient_info_lookup:
-                        self.patient_info_lookup[name_key] = {
-                            "dob": dob,
-                            "mrn": mrn
-                        }
-                    provider = str(row.get('Provider', '')).strip()
-                    provider_key = (last, first, dos)
+                        if name_key not in self.patient_info_lookup:
+                            self.patient_info_lookup[name_key] = {
+                                "dob": dob,
+                                "mrn": mrn
+                            }
+                        provider = str(row.get('Provider', '')).strip()
+                        provider_key = (last, first, dos)
 
-                    if (code, dos) not in [(c, d) for c, d, _ in self.encounter_lookup[(last, first)][appointment_num]]:
-                        self.encounter_lookup[(last, first)][appointment_num].append((code, dos, provider))
+                        if (code, dos) not in [(c, d) for c, d, _ in self.encounter_lookup[(last, first)][appointment_num]]:
+                            self.encounter_lookup[(last, first)][appointment_num].append((code, dos, provider))
 
-                    if i % max(1, total_rows // 20) == 0:
-                        progress_val = 40 + int((i / total_rows) * 60)
-                        self._update_progress(progress_val)
+                        if i % max(1, total_rows // 20) == 0:
+                            progress_val = 40 + int((i / total_rows) * 60)
+                            self._update_progress(progress_val)
 
                 self._safe_insert(f"Retrieved {len(df)} rows from Tableau.\n")
 

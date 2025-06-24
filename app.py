@@ -215,7 +215,7 @@ class TableauApp(tb.Window):
         elif site == "Elite":
             license_key = "160214"
         elif site == "Concord":
-            license_key = ""
+            license_key = "159127"
         else:
             messagebox.showwarning(
                 "Site Required",
