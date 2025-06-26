@@ -6,8 +6,9 @@ import threading
 import os
 from collections import defaultdict
 from tableau_fetch import TableauFetcher
-from excel_processing import process_excel_file
-from process_names import get_names
+from process_elite_and_larkin import process_excel_file
+from oldest_dos import get_oldest_dos
+from process_concord import process_concord
 
 # Configure CustomTkinter appearance
 ctk.set_appearance_mode("dark")
@@ -82,6 +83,7 @@ class TableauApp(tb.Window):
 
         self.encounter_lookup = defaultdict(lambda: defaultdict(list))
         self.df_tableau = None
+        self.uploaded_file_path = None
         self.fetcher = TableauFetcher(
             username=credentials['username'],
             password=credentials['password'],
@@ -104,8 +106,16 @@ class TableauApp(tb.Window):
 
         # Single button to select file and kick off all processing
         self.upload_btn = tb.Button(btn_frame, text="Upload & Process File",
-                                    bootstyle="primary", command=self.upload_file)
+                                    bootstyle="primary", command=self.upload_file) 
         self.upload_btn.pack(side="left", padx=5)
+
+        self.process_btn = tb.Button(
+            btn_frame,
+            text="Process Tableau Data",
+            bootstyle="success",
+            command=self.start_processing
+        )
+        self.process_btn.pack(side="left", padx=5)
 
     def append_output(self, text):
         self.output_text.after(0, lambda: self.output_text.insert("end", text))
@@ -113,7 +123,7 @@ class TableauApp(tb.Window):
     def update_progress(self, val):
         self.progress.after(0, lambda: self.progress.config(value=val))
 
-    def fetch_tableau_data(self, names):
+    def fetch_tableau_data(self, date):
         self.output_text.delete("1.0", "end")
         self.append_output("Connecting to Tableau...\n")
         self.progress.configure(mode="determinate", maximum=100)
@@ -135,7 +145,7 @@ class TableauApp(tb.Window):
         def worker():
             try:
                 # Pass patient-name list to fetcher
-                df = self.fetcher.fetch_data(license_key, filter_values=names)
+                df = self.fetcher.fetch_data(license_key, filter_values=date)
                 if df is not None:
                     self.df_tableau = df
                     self.encounter_lookup = self.fetcher.encounter_lookup
@@ -147,8 +157,22 @@ class TableauApp(tb.Window):
 
         threading.Thread(target=worker, daemon=True).start()
 
+    def start_processing(self):
+        site = self.site_choice.get()
+        if site == "Larkin":
+            license_key = "137797"
+        elif site == "Elite":
+            license_key = "160214"
+        elif site == "Concord":
+            license_key = ""
+        else:
+            messagebox.showwarning("Site Required", "Please select a site before processing.")
+            return
+
+        self.process_file(license_key)
+    
     def upload_file(self):
-        file_path = filedialog.askopenfilename(
+        self.uploaded_file_path = filedialog.askopenfilename(
             title="Select Patient List",
             filetypes=[
                 ("Excel files", ("*.xlsx", "*.xls")),
@@ -156,13 +180,13 @@ class TableauApp(tb.Window):
                 ("All files",   ("*.*",)),
             ]
         )
-        if not file_path:
+        if not self.uploaded_file_path:
             return
 
         def worker():
-            names = get_names(file_path)
+            date = get_oldest_dos(self.uploaded_file_path)
             # Once names are ready, trigger fetch
-            self.after(0, lambda: self.fetch_tableau_data(names))
+            self.after(0, lambda: self.fetch_tableau_data(date))
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -176,27 +200,32 @@ class TableauApp(tb.Window):
             )
             return
 
-        file_path = filedialog.askopenfilename(
-            filetypes=[("Excel files", "*.xlsx *.xls")]
-        )
+        file_path = self.uploaded_file_path
         if not file_path:
+            messagebox.showwarning(
+                "Missing File",
+                "No file has been uploaded yet. Please upload a file first."
+            )
             return
 
         def worker():
-            processed_path = process_excel_file(
-                file_path,
-                license_key,
-                encounter_lookup=self.encounter_lookup,
-                df_tableau=self.df_tableau,
-                output_callback=self.append_output,
-                tableau_fetcher=self.fetcher,
-            )
-            if processed_path:
-                if messagebox.askyesno(
-                    "Open File",
-                    f"Processed file saved:\n{processed_path}\n\nDo you want to open it?"
-                ):
-                    os.startfile(processed_path)
+            if(license_key != ""):
+                processed_path = process_excel_file(
+                    file_path,
+                    license_key,
+                    encounter_lookup=self.encounter_lookup,
+                    df_tableau=self.df_tableau,
+                    output_callback=self.append_output,
+                    tableau_fetcher=self.fetcher,
+                )
+                if processed_path:
+                    if messagebox.askyesno(
+                        "Open File",
+                        f"Processed file saved:\n{processed_path}\n\nDo you want to open it?"
+                    ):
+                        os.startfile(processed_path)
+            else:
+                process_concord(self.df_tableau, file_path)
 
         threading.Thread(target=worker, daemon=True).start()
 

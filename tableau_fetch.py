@@ -1,8 +1,13 @@
 from collections import defaultdict
 import tableauserverclient as TSC
+from tableauserverclient import Pager
 import pandas as pd
 from pandas.errors import EmptyDataError
 from io import BytesIO
+from datetime import datetime, timedelta
+
+yesterday = (datetime.today() - timedelta(days=1)).strftime("%#m/%#d/%Y")
+
 
 class TableauFetcher:
     def __init__(self, username, password, output_callback=None, progress_callback=None):
@@ -17,6 +22,8 @@ class TableauFetcher:
     def _safe_insert(self, text):
         if self.output_callback:
             self.output_callback(text)
+        else:
+            print(text, end="")
 
     def _update_progress(self, value):
         if self.progress_callback:
@@ -29,76 +36,67 @@ class TableauFetcher:
                 "https://tableau.blitzmedical.com",
                 use_server_version=True
             )
-
+            server.add_http_options({'timeout': 3600})
             # Determine view based on license_key
             view_id = (
                 "28773dd1-0c1e-445b-96f9-264fcdd0f485"
                 if license_key in ('160214', '137797')
-                else "19921e6e-ff1c-44fa-810d-b129b2806078"
+                else "361cd6c0-1086-4c4e-ae74-f9b92639eda6"
             )
             with server.auth.sign_in(tableau_auth):
                 self._update_progress(5)
-                target_view = server.views.get_by_id(view_id)
-                if not target_view:
-                    self._safe_insert("Target view not found.\n")
+                target = "Concord Census Reconciliation View"
+                all_views = list(TSC.Pager(server.views))
+                oldest_dos = filter_values
+                matched_views = [view for view in all_views if view.name == target]
+
+                target_view = matched_views[0]
+                opts = TSC.CSVRequestOptions()
+                opts.max_rows = -1
+                opts.include_all_columns = True
+
+                def generate_dates(from_date, to_date):
+                    date_format = "%Y-%m-%d"
+                    from_date = datetime.strptime(from_date, date_format)
+                    to_date = datetime.strptime(to_date, date_format)
+
+                    dates = []
+                    current_date = from_date
+                    while current_date <= to_date:
+                        dates.append(current_date.strftime(date_format))
+                        current_date += timedelta(days=1)
+
+                    return ",".join(dates)
+
+                def normalize_date(d):
+                    return datetime.strptime(d, "%m/%d/%Y").strftime("%Y-%m-%d")
+                
+                start = normalize_date(oldest_dos)
+                end = normalize_date(yesterday)
+                date_range = generate_dates(start, end)
+                opts.vf("DOS", date_range)
+        
+                if license_key in ('160214', '137797'):
+                    opts.vf("Charge Code", "")
+                    opts.vf("Last Name", "")
+                    opts.vf("License Key", license_key)
+                            
+                server.views.populate_csv(target_view, req_options=opts)
+                slice_bytes = b"".join (target_view.csv)
+                    
+                if not slice_bytes.strip():
+                    self._safe_insert("No rows returned from Tableau.\n")
+                    self._update_progress(100)
                     return None
-                self._update_progress(10)
-                self._safe_insert(f"Filtering for {len(filter_values)} patient names and license/group...\n")
 
-                # Batch patient names into chunks to avoid URL limits
-                chunk_size = 150
-                batches = [
-                    filter_values[i : i + chunk_size]
-                    for i in range(0, len(filter_values), chunk_size)
-                ]
-                dfs = []
-                total_batches = len(batches)
-       
-                for idx, batch in enumerate(batches):
-                    opts = TSC.CSVRequestOptions()
-                    opts.max_rows = -1
-                    opts.include_all_columns = True
-                    # apply patient name filters
-                    for name in batch:
-                        opts.vf("Patient Name", name)
-                    # apply license key or group filter
-                    if license_key in ('160214', '137797'):
-                        opts.vf("Charge Code", "")
-                        opts.vf("Last Name", "")
-                        opts.vf("License Key", license_key)
-                    else:
-                        opts.vf("License Key (group)", "Blitz Concord")
+                try:
+                    df = pd.read_csv(BytesIO(slice_bytes), on_bad_lines='warn', engine="python")
+                except EmptyDataError:
+                    self._safe_insert("Returned CSV had no columns.\n")
+                    self._update_progress(100)
+                    return None
 
-                    server.views.populate_csv(target_view, req_options=opts)
-                    slice_bytes = b"".join(target_view.csv)
-                    # slice_bytes is showing up as b'\r\n' - search up what this means and maybe filter issue idk?
-                    print(slice_bytes)
-                    if not slice_bytes.strip():
-                        self._safe_insert(f"Batch {idx+1}/{total_batches} returned no rows—skipping.\n")
-                        # still bump progress so the bar moves
-                        prog = 15 + int((idx + 1) / total_batches * 20)
-                        self._update_progress(prog)
-                        continue
-                    try:
-                        df_slice = pd.read_csv(
-                            BytesIO(slice_bytes),
-                            on_bad_lines='warn',
-                            engine="python"
-                        )
-                    except EmptyDataError:
-                        self._safe_insert(f"Batch {idx+1} had no columns—skipping.\n")
-                        prog = 15 + int((idx + 1) / total_batches * 20)
-                        self._update_progress(prog)
-                        continue
-                    dfs.append(df_slice)
-
-                    # update progress
-                    prog = 15 + int((idx + 1) / total_batches * 20)
-                    self._update_progress(prog)
-
-                # Combine all slices
-                df = pd.concat(dfs, ignore_index=True)
-                self._safe_insert("Downloaded and concatenated all filtered slices.\n")
+                self._safe_insert("Downloaded filtered rows from Tableau.\n")
 
                 # If needed, build encounter lookups for license-key mode
                 if license_key in ('160214', '137797'):
@@ -127,6 +125,7 @@ class TableauFetcher:
                 self._safe_insert(f"Retrieved {len(df)} rows from Tableau.\n")
                 self.df_tableau = df
                 self._update_progress(100)
+
                 return df
 
         except Exception as e:
