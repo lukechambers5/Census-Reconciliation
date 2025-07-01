@@ -6,8 +6,6 @@ from pandas.errors import EmptyDataError
 from io import BytesIO
 from datetime import datetime, timedelta
 
-yesterday = (datetime.today() - timedelta(days=1)).strftime("%#m/%#d/%Y")
-
 
 class TableauFetcher:
     def __init__(self, username, password, output_callback=None, progress_callback=None):
@@ -37,19 +35,21 @@ class TableauFetcher:
                 use_server_version=True
             )
             server.add_http_options({'timeout': 3600})
-            # Determine view based on license_key
-            view_id = (
-                "28773dd1-0c1e-445b-96f9-264fcdd0f485"
-                if license_key in ('160214', '137797')
-                else "361cd6c0-1086-4c4e-ae74-f9b92639eda6"
-            )
+
             with server.auth.sign_in(tableau_auth):
                 self._update_progress(5)
                 target = "Concord Census Reconciliation View"
+                if(license_key != ""):
+                    target = "EHP Census Reconciliation Details"
                 all_views = list(TSC.Pager(server.views))
                 oldest_dos = filter_values
-                matched_views = [view for view in all_views if view.name == target]
 
+                # TEST LINE
+                oldest_dos = "5/26/2024"
+                # yesterday = (datetime.today() - timedelta(days=1)).strftime("%#m/%#d/%Y")
+                yesterday = "12/31/2024"
+                
+                matched_views = [view for view in all_views if view.name == target]
                 target_view = matched_views[0]
                 opts = TSC.CSVRequestOptions()
                 opts.max_rows = -1
@@ -75,15 +75,12 @@ class TableauFetcher:
                 end = normalize_date(yesterday)
                 date_range = generate_dates(start, end)
                 opts.vf("DOS", date_range)
-        
                 if license_key in ('160214', '137797'):
                     opts.vf("Charge Code", "")
                     opts.vf("Last Name", "")
                     opts.vf("License Key", license_key)
-                            
                 server.views.populate_csv(target_view, req_options=opts)
                 slice_bytes = b"".join (target_view.csv)
-                    
                 if not slice_bytes.strip():
                     self._safe_insert("No rows returned from Tableau.\n")
                     self._update_progress(100)
@@ -95,8 +92,8 @@ class TableauFetcher:
                     self._safe_insert("Returned CSV had no columns.\n")
                     self._update_progress(100)
                     return None
-
                 self._safe_insert("Downloaded filtered rows from Tableau.\n")
+                
 
                 # If needed, build encounter lookups for license-key mode
                 if license_key in ('160214', '137797'):
@@ -116,16 +113,15 @@ class TableauFetcher:
                         if name_key not in self.patient_info_lookup:
                             self.patient_info_lookup[name_key] = {"dob": dob, "mrn": mrn}
 
-                        if (code, dos) not in [c_d for c_d, _p in self.encounter_lookup[(last, first)][appointment_num]]:
+                        if (code, dos) not in [(c, d) for c, d, _ in self.encounter_lookup[(last, first)][appointment_num]]:
                             self.encounter_lookup[(last, first)][appointment_num].append((code, dos, provider))
 
                         if i % max(1, total_rows // 20) == 0:
                             self._update_progress(40 + int((i / total_rows) * 60))
-
                 self._safe_insert(f"Retrieved {len(df)} rows from Tableau.\n")
                 self.df_tableau = df
                 self._update_progress(100)
-
+                
                 return df
 
         except Exception as e:

@@ -123,9 +123,9 @@ class TableauApp(tb.Window):
     def update_progress(self, val):
         self.progress.after(0, lambda: self.progress.config(value=val))
 
-    def fetch_tableau_data(self, date):
+    def fetch_tableau_data(self, date): # add date
         self.output_text.delete("1.0", "end")
-        self.append_output("Connecting to Tableau...\n")
+        
         self.progress.configure(mode="determinate", maximum=100)
         self.progress['value'] = 0
         self.upload_btn.configure(state="disabled")
@@ -145,13 +145,14 @@ class TableauApp(tb.Window):
         def worker():
             try:
                 # Pass patient-name list to fetcher
+                self.append_output("Connecting to Tableau...\n")
                 df = self.fetcher.fetch_data(license_key, filter_values=date)
                 if df is not None:
                     self.df_tableau = df
                     self.encounter_lookup = self.fetcher.encounter_lookup
-                    self.append_output("\nFetch complete.\n")
+                    self.append_output("Fetch complete.\n")
                 else:
-                    self.append_output("\nFetch failed.\n")
+                    self.append_output("Fetch failed.\n")
             finally:
                 self.upload_btn.configure(state="normal")
 
@@ -184,21 +185,20 @@ class TableauApp(tb.Window):
             return
 
         def worker():
+            self.append_output("Finding oldest date to filter...\n")
             date = get_oldest_dos(self.uploaded_file_path)
-            # Once names are ready, trigger fetch
             self.after(0, lambda: self.fetch_tableau_data(date))
 
         threading.Thread(target=worker, daemon=True).start()
 
-
-
     def process_file(self, license_key):
-        if self.encounter_lookup is None:
-            messagebox.showwarning(
-                "Data Missing",
-                "Please fetch Tableau data before uploading Excel file."
-            )
-            return
+        if(license_key != ""):
+            if self.encounter_lookup is None:
+                messagebox.showwarning(
+                    "Data Missing",
+                    "Please fetch Tableau data before uploading Excel file."
+                )
+                return
 
         file_path = self.uploaded_file_path
         if not file_path:
@@ -225,7 +225,15 @@ class TableauApp(tb.Window):
                     ):
                         os.startfile(processed_path)
             else:
-                process_concord(self.df_tableau, file_path)
+                self.append_output("\nProcessing data...\n")
+                processed_path = process_concord(self.df_tableau, file_path)
+
+                if processed_path:
+                    if messagebox.askyesno(
+                        "Open File",
+                        f"Processed file saved:\n{processed_path}\n\nDo you want to open it?"
+                    ):
+                        os.startfile(processed_path)
 
         threading.Thread(target=worker, daemon=True).start()
 
