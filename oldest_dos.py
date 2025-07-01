@@ -13,5 +13,5 @@ def get_oldest_dos(file_path):
 
     df["Date of Service"] = pd.to_datetime(df["Date of Service"], errors="coerce")
     oldest_dos = df["Date of Service"].dropna().min()
-    print("OLDEST DOS:", oldest_dos.strftime("%#m/%#d/%Y"))
+
     return oldest_dos.strftime("%#m/%#d/%Y") if pd.notnull(oldest_dos) else None

@@ -1,11 +1,9 @@
 from collections import defaultdict
 import tableauserverclient as TSC
-from tableauserverclient import Pager
 import pandas as pd
 from pandas.errors import EmptyDataError
 from io import BytesIO
 from datetime import datetime, timedelta
-
 
 class TableauFetcher:
     def __init__(self, username, password, output_callback=None, progress_callback=None):
@@ -43,11 +41,7 @@ class TableauFetcher:
                     target = "EHP Census Reconciliation Details"
                 all_views = list(TSC.Pager(server.views))
                 oldest_dos = filter_values
-
-                # TEST LINE
-                oldest_dos = "5/26/2024"
-                # yesterday = (datetime.today() - timedelta(days=1)).strftime("%#m/%#d/%Y")
-                yesterday = "12/31/2024"
+                yesterday = (datetime.today() - timedelta(days=1)).strftime("%#m/%#d/%Y")
                 
                 matched_views = [view for view in all_views if view.name == target]
                 target_view = matched_views[0]
@@ -94,7 +88,6 @@ class TableauFetcher:
                     return None
                 self._safe_insert("Downloaded filtered rows from Tableau.\n")
                 
-
                 # If needed, build encounter lookups for license-key mode
                 if license_key in ('160214', '137797'):
                     self._safe_insert("Building encounter lookup...\n")

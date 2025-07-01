@@ -1,9 +1,5 @@
 import pandas as pd
 import os
-from openpyxl import load_workbook
-from openpyxl.styles import PatternFill
-import tkinter as tk
-from tkinter import messagebox
 
 def process_concord(df_tableau, file_path):
     ext = os.path.splitext(file_path)[1].lower()
@@ -11,8 +7,6 @@ def process_concord(df_tableau, file_path):
         df = pd.read_csv(file_path)
     else:
         df = pd.read_excel(file_path)
-
-    #df = df_full.iloc[:2000].copy()
 
     # FILTER OUT NON-BLITZ
     df = df[~((df['Location Code'] == 'CMG_ADVHMA') & (df['Department Code'] == 'ED'))]
@@ -41,7 +35,6 @@ def process_concord(df_tableau, file_path):
         )
         name_lookup[key] = row.to_dict()
         
-
     # ID INSERTION LOGIC and Tableau Fetch LOGIC
     df.insert(0, 'ID (DOS_ACCT)', '')
     df.insert(1, 'ID2 (DOS_MRN)', '') 
@@ -79,11 +72,9 @@ def process_concord(df_tableau, file_path):
             if acct:
                 combined_id = serial_date + acct
                 df.at[idx, 'ID (DOS_ACCT)'] = combined_id
-            
             if mrn:
                 combined_id_2 = serial_date + mrn
                 df.at[idx, 'ID2 (DOS_MRN)'] = combined_id_2
-
             if patient_name:
                 combined_id_3 = serial_date + patient_name
                 df.at[idx, 'ID3 (DOS_Patient Name)'] = combined_id_3
@@ -105,8 +96,6 @@ def process_concord(df_tableau, file_path):
         except Exception as e:
             print(f"Row {idx} error: {e}")
 
-            
-    
     new_file_path = os.path.join(os.path.dirname(file_path), "PROCESSED_____" + os.path.basename(file_path))
 
     if ext == ".csv":

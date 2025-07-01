@@ -124,7 +124,6 @@ class TableauApp(tb.Window):
         self.progress.after(0, lambda: self.progress.config(value=val))
 
     def fetch_tableau_data(self, date): # add date
-        self.output_text.delete("1.0", "end")
         
         self.progress.configure(mode="determinate", maximum=100)
         self.progress['value'] = 0
@@ -187,6 +186,7 @@ class TableauApp(tb.Window):
         def worker():
             self.append_output("Finding oldest date to filter...\n")
             date = get_oldest_dos(self.uploaded_file_path)
+            self.append_output(f"Oldest date found: {date}\n") 
             self.after(0, lambda: self.fetch_tableau_data(date))
 
         threading.Thread(target=worker, daemon=True).start()
