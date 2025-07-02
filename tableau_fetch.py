@@ -35,7 +35,7 @@ class TableauFetcher:
             server.add_http_options({'timeout': 3600})
 
             with server.auth.sign_in(tableau_auth):
-                self._update_progress(5)
+                self._update_progress(0.05)
                 target = "Concord Census Reconciliation View"
                 if(license_key != ""):
                     target = "EHP Census Reconciliation Details"
@@ -77,14 +77,14 @@ class TableauFetcher:
                 slice_bytes = b"".join (target_view.csv)
                 if not slice_bytes.strip():
                     self._safe_insert("No rows returned from Tableau.\n")
-                    self._update_progress(100)
+                    self._update_progress(1)
                     return None
 
                 try:
                     df = pd.read_csv(BytesIO(slice_bytes), on_bad_lines='warn', engine="python")
                 except EmptyDataError:
                     self._safe_insert("Returned CSV had no columns.\n")
-                    self._update_progress(100)
+                    self._update_progress(1)
                     return None
                 self._safe_insert("Downloaded filtered rows from Tableau.\n")
                 
@@ -110,14 +110,14 @@ class TableauFetcher:
                             self.encounter_lookup[(last, first)][appointment_num].append((code, dos, provider))
 
                         if i % max(1, total_rows // 20) == 0:
-                            self._update_progress(40 + int((i / total_rows) * 60))
+                            self._update_progress(40 + int(((i / total_rows) * 60)) / 100 )
                 self._safe_insert(f"Retrieved {len(df)} rows from Tableau.\n")
                 self.df_tableau = df
-                self._update_progress(100)
+                self._update_progress(1)
                 
                 return df
 
         except Exception as e:
             self._safe_insert(f"Error fetching Tableau data: {e}\n")
-            self._update_progress(100)
+            self._update_progress(1)
             return None

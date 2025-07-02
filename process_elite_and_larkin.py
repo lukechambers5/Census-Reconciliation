@@ -51,7 +51,6 @@ def process_excel_file(file_path, license_key, encounter_lookup=None, df_tableau
                         })
             enc_df = pd.DataFrame(enc_rows)
 
-
             enc_df['is_99'] = enc_df['Code'].str.startswith('99', na=False)
 
             enc_df = enc_df.sort_values(
@@ -112,7 +111,6 @@ def process_excel_file(file_path, license_key, encounter_lookup=None, df_tableau
                 mask_name_exists = key_series.isin(tableau_keys)
                 df.loc[~mask_name_exists, 'Status'] = 'NAME NOT FOUND IN TABLEAU'
                 
-
             elif license_key == '137797':
                 tableau_keys = set(encounter_lookup.keys())
                 patient_keys    = list(zip(df['Last Name'], df['FirstKey']))
@@ -144,7 +142,6 @@ def process_excel_file(file_path, license_key, encounter_lookup=None, df_tableau
             keys = list(zip(df['Last Name'], df['FirstKey']))
             df['Patient MRN'] = [mrn_map.get(k, "") for k in keys]
             df['Patient DOB'] = [dob_map.get(k, "") for k in keys]
-
 
         # GENERATE IDs
         if license_key in ('160214','137797'):
