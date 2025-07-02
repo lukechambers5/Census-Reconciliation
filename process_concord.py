@@ -23,17 +23,24 @@ def process_concord(df_tableau, file_path):
     df = df[~((df['Location Code'] == 'CMG_WDLN') & (df['Department Code'] == 'HOSPITALIST'))]
 
     # NAME DICTIONARY
-    df_tableau['FirstName'] = df_tableau['FirstName'].astype(str).str.strip()
+    df_tableau['FirstName'] = df_tableau['FirstName'].astype(str).str.strip().str.upper().str.split().str[0]
     df_tableau['Last Name'] = df_tableau['Last Name'].astype(str).str.strip()
     df_tableau['DOS'] = pd.to_datetime(df_tableau['DOS'], errors='coerce')
+    df_tableau['Chart Number'] = df_tableau['Chart Number'].astype(str).str.strip() # ADDED Chart number *** - maybe MRN need to check this
     name_lookup = {}
     for _, row in df_tableau.iterrows():
-        key = (
+        key_dos = (
             row['Last Name'],
             row['FirstName'],
             row['DOS'],
         )
-        name_lookup[key] = row.to_dict()
+        key_mrn = (
+            row['Last Name'],
+            row['FirstName'],
+            row['Chart Number'], # ADDED Chart Number (MRN)
+        )
+        name_lookup[key_dos] = row.to_dict()
+        name_lookup[key_mrn] = row.to_dict()
         
     # ID INSERTION LOGIC and Tableau Fetch LOGIC
     df.insert(0, 'ID (DOS_ACCT)', '')
@@ -66,7 +73,7 @@ def process_concord(df_tableau, file_path):
                 continue
 
             last = last_first[0].strip().upper()
-            first = last_first[1].strip().upper()
+            first = last_first[1].strip().upper().split()[0]
 
             # IDs
             if acct:
@@ -80,9 +87,15 @@ def process_concord(df_tableau, file_path):
                 df.at[idx, 'ID3 (DOS_Patient Name)'] = combined_id_3
             
             # GET TABLEAU DATA
+            match = None
             key = (last, first, date_obj)
+            key2 = (last, first, mrn)
             if key in name_lookup:
                 match = name_lookup[key]
+            elif key2 in name_lookup:
+                match = name_lookup[key2]
+                
+            if match:
                 df.at[idx, 'Patient Name '] = match.get('Patient Name', '')
                 df.at[idx, 'Provider'] = match.get('Provider', '')
                 df.at[idx, 'Carrier'] = match.get('Carrier', '')

@@ -37,7 +37,7 @@ def process_excel_file(file_path, license_key, encounter_lookup=None, df_tableau
         if encounter_lookup and license_key in ('160214', '137797'):
             enc_rows = []
             for (last, first), appts in encounter_lookup.items():
-                key_first = first.upper()
+                key_first = first.upper().split()[0]
                 for appt_id, entries in appts.items():
                     for code, dos_str, provider in entries:
                         enc_rows.append({

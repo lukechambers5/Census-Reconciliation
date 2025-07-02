@@ -4,40 +4,6 @@ This internal-use Python application streamlines reconciliation of hospital Exce
 
 ---
 
-## Demo
-
-### Login
-![Login](assets/ss0.png)
-
-Lets user login to access Tableau data
-
-### Launch Screen   
-![Launch Screen](assets/ss1.png)
-
-The app's initial interface for starting the reconciliation workflow. 
-
-### Tableau Connection  
-![Connecting to Tableau](assets/ss2.png)
-
-Enter your license key to securely connect to Tableau.  
-
-### Data Retrieval  
-![Retrieving Data](assets/ss3.png)
-
-Once connected, patient encounter data is fetched from the Tableau view.  
-
-### Data Ready  
-![Data Retrieved](assets/ss4.png)
-
-Data successfully retrieved and available for reconciliation.  
-
-### File Upload & Results   
-![Processed Output](assets/ss5.png)
-
-Upload your hospital Excel file, then access the processed, reconciled output.
-
----
-
 ## 📌 What It Does
 
 - Connects to a Tableau view to fetch patient charge codes

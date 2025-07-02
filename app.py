@@ -10,18 +10,15 @@ from process_elite_and_larkin import process_excel_file
 from oldest_dos import get_oldest_dos
 from process_concord import process_concord
 
-# Configure CustomTkinter appearance
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("dark-blue")
 
 class TableauApp(tb.Window):
     def __init__(self):
         super().__init__(themename="cyborg")
-        # Hide main window until login succeeds
         self.withdraw()
 
         credentials = {}
-        # -- Login Dialog --
         login = ctk.CTkToplevel(self)
         login.title("Login to Tableau")
         login.geometry("800x350")
@@ -75,7 +72,6 @@ class TableauApp(tb.Window):
             self.destroy()
             return
 
-        # -- Main Window --
         self.deiconify()
         self.title("Census Reconciliation Tool")
         self.geometry("1050x600")
@@ -104,7 +100,6 @@ class TableauApp(tb.Window):
         btn_frame = tb.Frame(self)
         btn_frame.pack(pady=(0,10))
 
-        # Single button to select file and kick off all processing
         self.upload_btn = tb.Button(btn_frame, text="Upload & Process File",
                                     bootstyle="primary", command=self.upload_file) 
         self.upload_btn.pack(side="left", padx=5)
@@ -123,8 +118,7 @@ class TableauApp(tb.Window):
     def update_progress(self, val):
         self.progress.after(0, lambda: self.progress.config(value=val))
 
-    def fetch_tableau_data(self, date): # add date
-        
+    def fetch_tableau_data(self, date):
         self.progress.configure(mode="determinate", maximum=100)
         self.progress['value'] = 0
         self.upload_btn.configure(state="disabled")
@@ -143,7 +137,6 @@ class TableauApp(tb.Window):
 
         def worker():
             try:
-                # Pass patient-name list to fetcher
                 self.append_output("Connecting to Tableau...\n")
                 df = self.fetcher.fetch_data(license_key, filter_values=date)
                 if df is not None:
@@ -221,7 +214,7 @@ class TableauApp(tb.Window):
                 if processed_path:
                     if messagebox.askyesno(
                         "Open File",
-                        f"Processed file saved:\n{processed_path}\n\nDo you want to open it?"
+                        f"Processed file saved:\n{processed_path}\n\nDo you want to open it?" 
                     ):
                         os.startfile(processed_path)
             else:
