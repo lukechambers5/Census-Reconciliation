@@ -86,11 +86,9 @@ class TableauFetcher:
                     self._safe_insert("Returned CSV had no columns.\n")
                     self._update_progress(1)
                     return None
-                self._safe_insert("Downloaded filtered rows from Tableau.\n")
                 
                 # If needed, build encounter lookups for license-key mode
                 if license_key in ('160214', '137797'):
-                    self._safe_insert("Building encounter lookup...\n")
                     total_rows = len(df)
                     for i, (_, row) in enumerate(df.iterrows()):
                         last = str(row['Last Name']).strip().upper()
@@ -111,7 +109,7 @@ class TableauFetcher:
 
                         if i % max(1, total_rows // 20) == 0:
                             self._update_progress(40 + int(((i / total_rows) * 60)) / 100 )
-                self._safe_insert(f"Retrieved {len(df)} rows from Tableau.\n")
+                self._safe_insert(f"Retrieved {len(df)} rows from Tableau. ")
                 self.df_tableau = df
                 self._update_progress(1)
                 

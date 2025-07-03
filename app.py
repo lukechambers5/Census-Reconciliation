@@ -5,6 +5,7 @@ import tableauserverclient as TSC
 from tkinter import messagebox, filedialog
 import threading
 import os
+import sys
 from collections import defaultdict
 from tableau_fetch import TableauFetcher
 from process_elite_and_larkin import process_excel_file
@@ -14,6 +15,15 @@ from PIL import Image, ImageTk, ImageSequence
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("dark-blue")
+
+def get_resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
 class TableauApp(tb.Window):
     def __init__(self):
@@ -108,6 +118,7 @@ class TableauApp(tb.Window):
         # Modern text box
         self.output_text = ctk.CTkTextbox(self.main_frame, height=250, width=675, font=("Consolas", 13))
         self.output_text.pack(pady=10)
+        self.output_text.configure(state="disabled")
 
         # Button container with rounded buttons
         btn_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")  # keep transparent for layout only
@@ -121,17 +132,134 @@ class TableauApp(tb.Window):
                                         command=self.start_processing)
         self.process_btn.pack(side="left", padx=10)
 
-        
         self.spinner_label = ctk.CTkLabel(self.main_frame, text="")
-        self.spinner_label.place(relx=0.75, rely=0.125, anchor="center")
+
+        # Help label at bottom-left
+        self.help_label = ctk.CTkLabel(self.main_frame, text="Need Help?", text_color="#1e90ff", cursor="hand2")
+        self.help_label.place(relx=0.9, rely=0.96, anchor="sw")
+        self.help_label.bind("<Button-1>", lambda e: self.after(0, self.open_help_window))
+
+    def open_help_window(self):
+        help_win = ctk.CTkToplevel(self)
+        help_win.title("Help Center")
+        help_win.geometry("800x700")  
+        help_win.resizable(False, False)
+
+        tabview = ctk.CTkTabview(help_win, width=780, height=660)
+        tabview.pack(padx=10, pady=10)
+
+        tabview.add("Elite / Larkin")
+        tabview.add("Concord")
+
+        # Elite/Larkin HELP
+        elite_larkin_help = ctk.CTkTextbox(tabview.tab("Elite / Larkin"), wrap="word")
+        elite_larkin_help.insert("0.0",
+            "Requirements:\n"
+            "• File must be Excel format (.xlsx or .xls)\n"
+            "• Must contain column: Patient Name (Last, First)\n"
+            "• Must contain column: Date of Service\n\n"
+
+            "Error Status Meanings:\n"
+            "• MISMATCH DOS:\n"
+            "   └─ A match was found by name, but the Date of Service does not match Tableau.\n\n"
+            "• INVALID CODE IN TABLEAU:\n"
+            "   └─ A Tableau match was found, but no valid CPT code was present in Tableau.\n"
+            "   └─ Valid CPT codes include: 99XXX, LWBS, AMA\n\n"
+            "• NAME NOT FOUND IN TABLEAU:\n"
+            "   └─ No matching patient name and DOS combination was found in Tableau.\n\n"
+
+            "Elite:\n"
+            "• Handles billing codes like 99XXX, LWBS, AMA, 0, and NULL\n"
+            "• Deterines status based on billing code and presence in Tableau\n"
+            "• Adds column E&M (Pro) based on billing code logic\n\n"
+            "Larkin:\n"
+            "• Used more direct lookup and sets reconciliation based on matches and preexisting status values\n"
+            "• Also attempts to fill Patient MRn and patient DOB from Tableau if abailable\n\n"
+            "If you still aren't getting expected output, look at screenshot of raw file that will process correctly, and make sure your file has same layout before uploading.\n\n"
+        )
+        elite_larkin_help.insert("end", "📁 View Unprocessed Larkin File Example\n", "larkin_link")
+        elite_larkin_help.insert("end", "\n") 
+        elite_larkin_help.insert("end", "📁 View Unprocessed Elite File Example\n", "elite_link")
+
+        elite_larkin_help.tag_config("larkin_link", foreground="cyan", underline=True)
+        elite_larkin_help.tag_config("elite_link", foreground="cyan", underline=True)
+
+        elite_larkin_help.tag_bind("larkin_link", "<Enter>", lambda e: elite_larkin_help.configure(cursor="hand2"))
+        elite_larkin_help.tag_bind("larkin_link", "<Leave>", lambda e: elite_larkin_help.configure(cursor=""))
+
+        elite_larkin_help.tag_bind("elite_link", "<Enter>", lambda e: elite_larkin_help.configure(cursor="hand2"))
+        elite_larkin_help.tag_bind("elite_link", "<Leave>", lambda e: elite_larkin_help.configure(cursor=""))
+
+        def open_larkin_file(event=None):
+            file_path = get_resource_path(os.path.join("public", "larkin.png"))
+            os.startfile(file_path)
+
+        def open_elite_file(event=None):
+            file_path = get_resource_path(os.path.join("public", "elite.png"))
+            os.startfile(file_path)
+
+        elite_larkin_help.tag_bind("larkin_link", "<Button-1>", open_larkin_file)
+        elite_larkin_help.tag_bind("elite_link", "<Button-1>", open_elite_file)
+
+        elite_larkin_help.pack(expand=True, fill="both", padx=10, pady=10)
+        elite_larkin_help.configure(state="disabled")
+
+        # Concord Help 
+        concord_help = ctk.CTkTextbox(tabview.tab("Concord"), wrap="word")
+        concord_help.insert("0.0",
+            "Requirements:\n"
+            "• File must be Excel (.xlsx, .xls) or CSV (.csv)\n"
+            "• Required columns:\n"
+            "   └─ Patient Name (Last, First)\n"
+            "   └─ Date of Service\n"
+            "   └─ Account Number\n"
+            "   └─ Medical Record Number\n\n"
+
+            "Auto-Filtered Out:\n"
+            "• Non-Blitz departments are removed automatically.\n\n"
+
+            "Processing Logic:\n"
+            "• Three ID columns are created using Date of Service combined with:\n"
+            "   └─ Account Number → ID (DOS_ACCT)\n"
+            "   └─ Medical Record Number → ID2 (DOS_MRN)\n"
+            "   └─ Full Patient Name → ID3 (DOS_Patient Name)\n\n"
+
+            "Matching Logic:\n"
+            "• The app attempts to match each row with Tableau data using:\n"
+            "   └─ (Last Name, First Name, Date of Service) or\n"
+            "   └─ (Last Name, First Name, MRN)\n"
+            "• If matched, Tableau fields like Provider, Carrier, and Facility are filled in.\n"
+            "• If no match is found, those columns are filled with '#N/A'\n\n"
+            "If you still aren't getting expected output, look at screenshot of raw file that will process correctly, and make sure your file has same layout before uploading.\n\n"
+        )
+
+        concord_help.insert("end", "📁 View Unprocessed Concord File Example\n", "concord_link")
+
+        concord_help.tag_config("concord_link", foreground="cyan", underline=True)
+
+        concord_help.tag_bind("concord_link", "<Enter>", lambda e: concord_help.configure(cursor="hand2"))
+        concord_help.tag_bind("concord_link", "<Leave>", lambda e: concord_help.configure(cursor=""))
+
+        def open_concord_file(event=None):
+            file_path = get_resource_path(os.path.join("public", "concord.png"))
+            os.startfile(file_path)
+
+        concord_help.tag_bind("concord_link", "<Button-1>", open_concord_file)
+
+        concord_help.pack(expand=True, fill="both", padx=10, pady=10)
+        concord_help.configure(state="disabled")
+
+        help_win.mainloop()
+
 
     def start_spinner(self):
+        self.spinner_label.place(relx=0.71, rely=0.14, anchor="center")
         gif_path = os.path.join(os.path.dirname(__file__), "public", "spinner.gif")
 
         try:
             pil_image = Image.open(gif_path)
             self.spinner_frames = [
-                CTkImage(light_image=frame.convert("RGBA").copy(), size=(50, 50))
+                CTkImage(light_image=frame.convert("RGBA").copy(), size=(25, 25))
                 for frame in ImageSequence.Iterator(pil_image)
             ]
 
@@ -158,7 +286,12 @@ class TableauApp(tb.Window):
         self.error_label.configure(text="")
 
     def append_output(self, text):
-        self.output_text.after(0, lambda: self.output_text.insert("end", text))
+        self.output_text.after(0, lambda: self._safe_insert_output(text))
+
+    def _safe_insert_output(self, text):
+        self.output_text.configure(state="normal")
+        self.output_text.insert("end", text)
+        self.output_text.configure(state="disabled")
 
     def update_progress(self, val):
         self.progress.after(0, lambda: self.progress.set(val))
@@ -181,7 +314,6 @@ class TableauApp(tb.Window):
 
         def worker():
             try:
-                self.append_output("Connecting to Tableau...\n")
                 df = self.fetcher.fetch_data(license_key, filter_values=date)
                 if df is not None:
                     self.df_tableau = df
@@ -221,13 +353,12 @@ class TableauApp(tb.Window):
         if not self.uploaded_file_path:
             return
         
-        self.output_text.delete("1.0", "end")
 
         def worker():
+            self.output_text.delete("1.0", "end")
+            self.append_output("Connecting to Tableau...\n")
             self.after(0, self.start_spinner)
-            self.append_output("Finding oldest date to filter...\n")
             date = get_oldest_dos(self.uploaded_file_path)
-            self.append_output(f"Oldest date found: {date}\n") 
             self.after(0, lambda: self.fetch_tableau_data(date))
 
 
@@ -249,10 +380,11 @@ class TableauApp(tb.Window):
                 "No file has been uploaded yet. Please upload a file first."
             )
             return
+        
+        self.after(0, self.start_spinner)
 
         def worker():
             try:
-                self.after(0, self.start_spinner)
                 if(license_key != ""):
                     processed_path = process_excel_file(
                         file_path,
@@ -262,24 +394,17 @@ class TableauApp(tb.Window):
                         output_callback=self.append_output,
                         tableau_fetcher=self.fetcher,
                     )
-                    if processed_path:
-                        if messagebox.askyesno(
-                            "Open File",
-                            f"Processed file saved:\n{processed_path}\n\nDo you want to open it?" 
-                        ):
-                            os.startfile(processed_path)
                 else:
                     self.append_output("\nProcessing data...\n")
                     processed_path = process_concord(self.df_tableau, file_path)
-
-                    if processed_path:
+            finally:
+                self.after(0, self.stop_spinner)
+                if processed_path:
                         if messagebox.askyesno(
                             "Open File",
                             f"Processed file saved:\n{processed_path}\n\nDo you want to open it?"
                         ):
                             os.startfile(processed_path)
-            finally:
-                self.after(0, self.stop_spinner)
 
         threading.Thread(target=worker, daemon=True).start()
 
