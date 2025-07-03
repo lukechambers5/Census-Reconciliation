@@ -141,7 +141,7 @@ class TableauApp(tb.Window):
     def open_help_window(self):
         help_win = ctk.CTkToplevel(self)
         help_win.title("Help Center")
-        help_win.geometry("800x700")  
+        help_win.geometry("800x700")
         help_win.resizable(False, False)
 
         tabview = ctk.CTkTabview(help_win, width=780, height=660)
@@ -174,7 +174,7 @@ class TableauApp(tb.Window):
             "Larkin:\n"
             "• Used more direct lookup and sets reconciliation based on matches and preexisting status values\n"
             "• Also attempts to fill Patient MRn and patient DOB from Tableau if abailable\n\n"
-            "If you still aren't getting expected output, look at screenshot of raw file that will process correctly, and make sure your file has same layout before uploading.\n\n"
+            "If you are getting errors, look at example RAW file that will process correctly and verify your file has the same layout.\n\n"
         )
         elite_larkin_help.insert("end", "📁 View Unprocessed Larkin File Example\n", "larkin_link")
         elite_larkin_help.insert("end", "\n") 
@@ -229,7 +229,7 @@ class TableauApp(tb.Window):
             "   └─ (Last Name, First Name, MRN)\n"
             "• If matched, Tableau fields like Provider, Carrier, and Facility are filled in.\n"
             "• If no match is found, those columns are filled with '#N/A'\n\n"
-            "If you still aren't getting expected output, look at screenshot of raw file that will process correctly, and make sure your file has same layout before uploading.\n\n"
+            "If you are getting errors, look at example RAW file that will process correctly and verify your file has the same layout.\n\n"
         )
 
         concord_help.insert("end", "📁 View Unprocessed Concord File Example\n", "concord_link")
