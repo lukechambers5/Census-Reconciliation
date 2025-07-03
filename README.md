@@ -70,3 +70,14 @@ This in-house Python application streamlines reconciliation of AdvancedMD record
 - Internal Use Only!
 - This tool is intended solely for authorized staff at Blitz Medical Billing. 
 - Do **not** distribute or use this application outside approved environments.
+
+## 🔐 Security & Compliance
+
+This application is designed to process healthcare data (e.g., names, MRNs, dates of service), but no PHI is committed to or stored in this repository.
+
+- No patient data is hardcoded or bundled.
+- All uploads happen locally on the user's machine.
+- Temporary and output files are not uploaded or retained externally.
+- Users are responsible for ensuring HIPAA compliance when operating this tool in a production environment.
+
+This repository contains logic only and is safe for internal, private use.

@@ -19,7 +19,6 @@ ctk.set_default_color_theme("dark-blue")
 def get_resource_path(relative_path):
     """ Get absolute path to resource, works for dev and PyInstaller """
     try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
         base_path = sys._MEIPASS
     except AttributeError:
         base_path = os.path.abspath(".")
@@ -52,11 +51,11 @@ class TableauApp(tb.Window):
         ctk.CTkLabel(container, text="").pack(pady=35)
 
         ctk.CTkLabel(container, text="Username:", font=label_font).pack(pady=(20,5))
-        self.username_entry = ctk.CTkEntry(container, width=300, height=35)
+        self.username_entry = ctk.CTkEntry(container, width=400, height=45)
         self.username_entry.pack(pady=(0,10))
 
         ctk.CTkLabel(container, text="Password:", font=label_font).pack(pady=(0,5))
-        self.password_entry = ctk.CTkEntry(container, width=300, height=35, show="*")
+        self.password_entry = ctk.CTkEntry(container, width=400, height=45, show="*")
         self.password_entry.pack(pady=(0,10))
 
         self.error_label = ctk.CTkLabel(container, text="", text_color="#FF5555", font=("Segoe UI", 10, "bold"))
