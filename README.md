@@ -1,44 +1,72 @@
 # Tableau Census Reconciliation Tool
 
-This internal-use Python application streamlines reconciliation of hospital Excel records with Tableau census data. It connects securely to Tableau, fetches patient encounter details, and applies automated matching and validation rules to uploaded Excel files — generating a reconciled output with status flags, calculated IDs, and charge code evaluations.
+This in-house Python application streamlines reconciliation of AdvancedMD records with Tableau census data. It connects securely to Tableau, fetches patient encounter details, and applies automated matching and validation rules to uploaded files, generating a reconciled output with status flags, calculated IDs, and Tableau-synced provider data.
 
 ---
 
-## 📌 What It Does
+## What It Does
 
-- Connects to a Tableau view to fetch patient charge codes
-- Accepts Excel files exported from hospital systems
-- Cleans and splits patient names for accurate matching
+- Connects to Tableau Server securely using `tableauserverclient`
+- Secure login with Tableau username/password credentials (no OAuth)
+- Accepts `.xlsx`, `.xls`, and `.csv` files from AMD reports
+- Identifies and matches patients by:
+  - Last name, first name, and date of service
+  - Or by medical record number (MRN)
+- Fetches census data based on site (Elite, Larkin, Concord)
 - Calculates patient encounter IDs (`ID1`, `ID2`, `ID3`)
-- Applies charge code logic:
+- Applies status and reconciliation logic for:
   - LWBS (Left Without Being Seen)
   - AMA (Against Medical Advice)
-  - Billed and non-ED encounters
-- Automatically updates `Status` to `DE_COMPLETE` when matched
-- Saves a processed copy of the Excel file with results
+  - Invalid or missing codes
+  - Name not found
+- Auto-fills Tableau values: Provider, Carrier, Facility
+- Saves a processed Excel file with detailed results
 
 ---
 
-## 💡 Key Features
+## Key Features
 
-- Desktop GUI with a modern dark theme
-- Fetches Tableau data and previews Excel transformations
-- Adds reconciliation columns automatically
-- Smart patient name parsing and serial date calculations
-- Option to open the cleaned file after processing
-- Handles errors gracefully with detailed tracebacks
+- Desktop GUI with dark mode using `CustomTkinter` + `ttkbootstrap`
+- Built-in client selector and login system
+- Animated loading spinner and progress bar
+- Auto-generates IDs and status columns
+- Help Center with usage instructions and sample file links
+- Graceful error handling with traceback logging
+- Opens processed file directly after confirmation
 
 ---
 
-## 🛠 Tech Highlights
+## Tech Highlights
 
-- **Python 3.9+**
-- GUI: `ttkbootstrap`
-- Data: `pandas`, `openpyxl`
+- **Python 3.10+**
+- GUI: `CustomTkinter`, `ttkbootstrap`
+- Data handling: `pandas`, `openpyxl`
 - Tableau API: `tableauserverclient`
-- Config support via `python-dotenv`
-- Compatible with PyInstaller `.exe` builds
+- Image handling: `Pillow`
+- Multi-threaded processing via `threading`
+- Windows-compatible with PyInstaller `.exe` support
 
 ---
 
-_Built to simplify reconciliation workflows and improve accuracy across finance and revenue cycle teams._
+## Input File Requirements
+
+### Elite / Larkin
+- Excel format: `.xlsx` or `.xls`
+- Required columns:
+  - `Patient Name (Last, First)`
+  - `Date of Service`
+
+### Concord
+- File format: `.xlsx`, `.xls`, or `.csv`
+- Required columns:
+  - `Patient Name`
+  - `Date of Service`
+  - `Account Number`
+  - `Medical Record Number`
+
+---
+
+## ⚠️ Note
+- Internal Use Only!
+- This tool is intended solely for authorized staff at Blitz Medical Billing. 
+- Do **not** distribute or use this application outside approved environments.
