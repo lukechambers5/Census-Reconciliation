@@ -11,7 +11,7 @@ from tableau_fetch import TableauFetcher
 from process_elite_and_larkin import process_excel_file
 from oldest_dos import get_oldest_dos
 from process_concord import process_concord
-from PIL import Image, ImageTk, ImageSequence
+from PIL import Image, ImageSequence
 
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("dark-blue")
@@ -354,10 +354,17 @@ class TableauApp(tb.Window):
         
 
         def worker():
-            self.output_text.delete("1.0", "end")
-            self.append_output("Connecting to Tableau...\n")
-            self.after(0, self.start_spinner)
-            date = get_oldest_dos(self.uploaded_file_path)
+            try:
+                self.output_text.delete("1.0", "end")
+                self.append_output("Connecting to Tableau...\n")
+                self.after(0, self.start_spinner)
+                date = get_oldest_dos(self.uploaded_file_path)
+            except Exception as e:
+                error_message = f"Error: {str(e)}"
+                if "columns expected but not found: ['Date of Service']" in error_message:
+                    self.after(0, lambda: self.append_output("Date of Service Column not in excel file." + "\n"))
+                self.after(0, self.stop_spinner)
+                return
             self.after(0, lambda: self.fetch_tableau_data(date))
 
 

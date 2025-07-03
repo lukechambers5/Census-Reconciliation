@@ -26,7 +26,7 @@ def process_concord(df_tableau, file_path):
     df_tableau['FirstName'] = df_tableau['FirstName'].astype(str).str.strip().str.upper().str.split().str[0]
     df_tableau['Last Name'] = df_tableau['Last Name'].astype(str).str.strip()
     df_tableau['DOS'] = pd.to_datetime(df_tableau['DOS'], errors='coerce')
-    df_tableau['Chart Number'] = df_tableau['Chart Number'].astype(str).str.strip() # ADDED Chart number *** - maybe MRN need to check this
+    df_tableau['Chart Number'] = df_tableau['Chart Number'].astype(str).str.strip()
     name_lookup = {}
     for _, row in df_tableau.iterrows():
         key_dos = (
@@ -37,7 +37,7 @@ def process_concord(df_tableau, file_path):
         key_mrn = (
             row['Last Name'],
             row['FirstName'],
-            row['Chart Number'], # ADDED Chart Number (MRN)
+            row['Chart Number'],
         )
         name_lookup[key_dos] = row.to_dict()
         name_lookup[key_mrn] = row.to_dict()
