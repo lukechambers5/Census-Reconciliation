@@ -86,7 +86,7 @@ def process_concord(df_tableau, file_path):
                 combined_id_3 = serial_date + patient_name
                 df.at[idx, 'ID3 (DOS_Patient Name)'] = combined_id_3
             
-            # GET TABLEAU DATA
+            # CHECK NAME/DOS and NAME/MRN and if either match then fetch lookup info with key
             match = None
             key = (last, first, date_obj)
             key2 = (last, first, mrn)

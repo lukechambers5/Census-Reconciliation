@@ -362,7 +362,9 @@ class TableauApp(tb.Window):
             except Exception as e:
                 error_message = f"Error: {str(e)}"
                 if "columns expected but not found: ['Date of Service']" in error_message:
-                    self.after(0, lambda: self.append_output("Date of Service Column not in excel file." + "\n"))
+                    self.after(0, lambda: self.append_output("[ERROR] Date of Service Column not in excel file. Process stopped." + "\n"))
+                else:
+                    self.after(0, lambda: self.append_output(f"[ERROR] {error_message}" + "\n"))
                 self.after(0, self.stop_spinner)
                 return
             self.after(0, lambda: self.fetch_tableau_data(date))
