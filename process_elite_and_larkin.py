@@ -13,8 +13,6 @@ def process_excel_file(file_path, license_key, encounter_lookup=None, df_tableau
             try:
                 df = xl.parse(sheet)
                 if "Date of Service" in df.columns:
-                    if output_callback:
-                        output_callback(f"[INFO] Using sheet: {sheet}\n")
                     break
             except Exception:
                 continue

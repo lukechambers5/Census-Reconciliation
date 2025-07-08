@@ -2,6 +2,15 @@
 
 This in-house Python application streamlines reconciliation of AdvancedMD records with Tableau census data. It connects securely to Tableau, fetches patient encounter details, and applies automated matching and validation rules to uploaded files, generating a reconciled output with status flags, calculated IDs, and Tableau-synced provider data.
 
+## Table of Contents
+- [What It Does](#what-it-does)
+- [Key Features](#key-features)
+- [Demo](#demo)
+- [Tech Highlights](#tech-highlights)
+- [Input File Requirements](#input-file-requirements)
+- [Security & Compliance](#security--compliance)
+
+
 ---
 
 ## What It Does
@@ -33,6 +42,19 @@ This in-house Python application streamlines reconciliation of AdvancedMD record
 - Help Center with usage instructions and sample file links
 - Graceful error handling with traceback logging
 - Opens processed file directly after confirmation
+
+---
+
+## Demo
+
+| **Login Screen**                                  | **Main Dashboard**                               |
+|:-------------------------------------------------:|:------------------------------------------------:|
+| <img src="screenshots/login.png" alt="Login" width="300"> | <img src="screenshots/main_screen.png" alt="Main" width="300"> |
+
+| **Help Center**                                   | **Processed Output**                             |
+|:-------------------------------------------------:|:------------------------------------------------:|
+| <img src="screenshots/help.png" alt="Help" width="300">  | <img src="screenshots/output.png" alt="Output" width="300"> |
+
 
 ---
 
