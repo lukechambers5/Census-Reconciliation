@@ -16,10 +16,11 @@ def get_oldest_dos(file_path):
                 continue
         else:
             raise ValueError("No sheet contains 'Date of Service' column")
-    print(df.columns.to_list())
+
     df["Date of Service"] = pd.to_datetime(df["Date of Service"], errors="coerce")
     oldest_dos = df["Date of Service"].dropna().min()
 
+    # Records past 2024 are already reconciled
     if pd.notnull(oldest_dos) and int(oldest_dos.strftime("%Y")) < 2023:
         return "01/01/2024"
     
