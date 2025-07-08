@@ -1,4 +1,4 @@
-# Tableau Census Reconciliation Tool
+# Census Reconciliation Tool
 
 This in-house Python application streamlines reconciliation of AdvancedMD records with Tableau census data. It connects securely to Tableau, fetches patient encounter details, and applies automated matching and validation rules to uploaded files, generating a reconciled output with status flags, calculated IDs, and Tableau-synced provider data.
 
