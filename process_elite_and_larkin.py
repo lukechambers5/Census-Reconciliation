@@ -8,15 +8,32 @@ def process_excel_file(file_path, license_key, encounter_lookup=None, df_tableau
         if output_callback:
             output_callback("Processing Excel file... May take some time for larger files\n")
 
-        df = pd.read_excel(
-            file_path,
-            parse_dates=['Date of Service'],
-            usecols=None
-        )
+        xl = pd.ExcelFile(file_path)
+        for sheet in xl.sheet_names:
+            try:
+                df = xl.parse(sheet)
+                if "Date of Service" in df.columns:
+                    if output_callback:
+                        output_callback(f"[INFO] Using sheet: {sheet}\n")
+                    break
+            except Exception:
+                continue
+        else:
+            raise ValueError("No sheet contains 'Date of Service' column")
+
+        # Convert DOS column to datetime after finding correct sheet
+        df["Date of Service"] = pd.to_datetime(df["Date of Service"], errors="coerce")
 
         # GET FIRST KEY
         if 'Patient Name' in df.columns:
             names = df['Patient Name'].astype(str).str.split(',', n=1, expand=True)
+            df['Last Name']  = names[0].str.strip().str.upper()
+            df['First Name'] = names[1].str.strip().str.upper().fillna("")
+            # key is first token before any space
+            df['FirstKey']  = df['First Name'].str.split().str[0]
+
+        if 'PatientName' in df.columns:
+            names = df['PatientName'].astype(str).str.split(',', n=1, expand=True)
             df['Last Name']  = names[0].str.strip().str.upper()
             df['First Name'] = names[1].str.strip().str.upper().fillna("")
             # key is first token before any space

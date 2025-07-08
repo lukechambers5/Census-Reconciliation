@@ -351,7 +351,6 @@ class TableauApp(tb.Window):
         )
         if not self.uploaded_file_path:
             return
-        
 
         def worker():
             try:
@@ -368,7 +367,6 @@ class TableauApp(tb.Window):
                 self.after(0, self.stop_spinner)
                 return
             self.after(0, lambda: self.fetch_tableau_data(date))
-
 
         threading.Thread(target=worker, daemon=True).start()
 
