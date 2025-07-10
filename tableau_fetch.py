@@ -119,3 +119,4 @@ class TableauFetcher:
             self._safe_insert(f"Error fetching Tableau data: {e}\n")
             self._update_progress(1)
             return None
+          
