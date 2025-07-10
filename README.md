@@ -8,7 +8,7 @@ This in-house Python application streamlines reconciliation of AdvancedMD record
 - [Demo](#demo)
 - [Tech Highlights](#tech-highlights)
 - [Input File Requirements](#input-file-requirements)
-- [Security & Compliance](#security--compliance)
+- [Security & Compliance](#⚠️-note)
 
 
 ---
