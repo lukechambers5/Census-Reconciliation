@@ -8,7 +8,7 @@ This in-house Python application streamlines reconciliation of AdvancedMD record
 - [Demo](#demo)
 - [Tech Highlights](#tech-highlights)
 - [Input File Requirements](#input-file-requirements)
-- [Security & Compliance](#⚠️-note)
+- [Security & Compliance](#note)
 
 
 ---
@@ -88,7 +88,7 @@ This in-house Python application streamlines reconciliation of AdvancedMD record
 
 ---
 
-## ⚠️ Note
+## Note
 - Internal Use Only!
 - This tool is intended solely for authorized staff at Blitz Medical Billing. 
 - Do **not** distribute or use this application outside approved environments.
