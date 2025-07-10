@@ -150,7 +150,7 @@ class TableauApp(tb.Window):
         tabview.add("Elite / Larkin")
         tabview.add("Concord")
 
-        # Elite/Larkin HELP
+        # Elite/Larkin HELP section
         elite_larkin_help = ctk.CTkTextbox(tabview.tab("Elite / Larkin"), wrap="word")
         elite_larkin_help.insert("0.0",
             "Requirements:\n"
