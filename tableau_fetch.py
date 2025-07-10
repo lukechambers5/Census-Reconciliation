@@ -6,6 +6,7 @@ from io import BytesIO
 from datetime import datetime, timedelta
 
 class TableauFetcher:
+    #
     def __init__(self, username, password, output_callback=None, progress_callback=None):
         self.username = username
         self.password = password
@@ -73,6 +74,7 @@ class TableauFetcher:
                     opts.vf("Charge Code", "")
                     opts.vf("Last Name", "")
                     opts.vf("License Key", license_key)
+                    opts.vf("CPT Code")
                 server.views.populate_csv(target_view, req_options=opts)
                 slice_bytes = b"".join (target_view.csv)
                 if not slice_bytes.strip():
