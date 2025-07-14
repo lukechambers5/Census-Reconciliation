@@ -64,7 +64,6 @@ This in-house Python application streamlines reconciliation of AdvancedMD record
 - GUI: `CustomTkinter`, `ttkbootstrap`
 - Data handling: `pandas`, `openpyxl`
 - Tableau API: `tableauserverclient`
-- Image handling: `Pillow`
 - Multi-threaded processing via `threading`
 - Windows-compatible with PyInstaller `.exe` support
 

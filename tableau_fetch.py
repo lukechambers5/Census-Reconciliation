@@ -26,6 +26,7 @@ class TableauFetcher:
         if self.progress_callback:
             self.progress_callback(value)
 
+
     def fetch_data(self, license_key, filter_values):
         try:
             tableau_auth = TSC.TableauAuth(self.username, self.password, '')

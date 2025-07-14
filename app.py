@@ -406,6 +406,7 @@ class TableauApp(tb.Window):
             finally:
                 self.after(0, self.stop_spinner)
                 if processed_path:
+                        self.append_output("\nDone processing!\n")
                         if messagebox.askyesno(
                             "Open File",
                             f"Processed file saved:\n{processed_path}\n\nDo you want to open it?"

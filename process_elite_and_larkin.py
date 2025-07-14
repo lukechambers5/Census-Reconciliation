@@ -164,7 +164,7 @@ def process_excel_file(file_path, license_key, encounter_lookup=None, df_tableau
             df['DobNorm'] = pd.to_datetime(
                 df['Patient DOB'], format='%m/%d/%Y', errors='coerce'
             ).dt.normalize()
-            serial_DOS = (df['DosNorm'] - pd.Timestamp('1899-12-30')).dt.days.astype(str)
+            serial_DOS = (df['DosNorm'] - pd.Timestamp('1899-12-30')).dt.days.astype(str) 
             serial_DOB = (df['DobNorm'] - pd.Timestamp('1899-12-30')).dt.days.astype(str)
 
             df['ID1'] = df['Patient MRN'].astype(str) + serial_DOS
